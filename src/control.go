@@ -2,9 +2,8 @@ package main
 
 import (
 	"fmt"
-	"os"
-
 	"github.com/nsf/termbox-go"
+	"os"
 )
 
 // getKeyboardCommand sends all keys pressed on the keyboard as runes (characters) on the key chan.
