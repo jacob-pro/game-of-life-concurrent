@@ -6,43 +6,6 @@ import (
 	"time"
 )
 
-func customMod(index int, max int) int {
-	if index >= max {
-		return index - max
-	} else if index < 0 {
-		return index + max
-	} else {
-		return index
-	}
-}
-
-func (w *World) computeStateUpdate() {
-	clone := w.Clone()
-	for y := 0; y < clone.height; y++ {
-		for x := 0; x < clone.width; x++ {
-			var neighboursAlive = 0
-			//Count alive cells in 3x3 grid
-			for i := y - 1; i <= y+1; i++ {
-				for j := x - 1; j <= x+1; j++ {
-					if clone.matrix[customMod(i, clone.height)][customMod(j, clone.width)] == ALIVE {
-						neighboursAlive++
-					}
-				}
-			}
-			if clone.matrix[y][x] == ALIVE {
-				neighboursAlive--
-				if neighboursAlive == 2 || neighboursAlive == 3 {
-					w.matrix[y][x] = ALIVE
-				} else {
-					w.matrix[y][x] = DEAD
-				}
-			} else if neighboursAlive == 3 {
-				w.matrix[y][x] = ALIVE
-			}
-		}
-	}
-}
-
 type distributorState struct {
 	currentTurn  int
 	currentWorld World
@@ -88,16 +51,28 @@ func ticker(state *distributorState) {
 		state.locker.Unlock()
 		fmt.Printf("On turn: %d there are %d alive\n", turn, len(world.CalculateAlive()))
 	}
+}
 
+func getImplementationFunction(s string) func(*World) {
+	if s == "" {
+		return ImplementationDefault.function()
+	} else {
+		impl, err := implementationFromString(s)
+		if err != nil {
+			panic(err)
+		} else {
+			return impl.function()
+		}
+	}
 }
 
 // distributor divides the work between workers and interacts with other goroutines.
 // d.keyChan is nil when launched by the test framework
 func distributor(p golParams, d distributorChans, alive chan []cell) {
 
-	// The state lock is used to synchronise the GoL algorithm and keyboard actions
-	// If no keyboard is connected (e.g. testing) then we do not need synchronisation
-	// Because the keyboard thread won't be doing anything
+	// The state lock is used to synchronise the Distributor, Keyboard, and Ticker threads.
+	// If no user is connected (e.g. testing/benchmark) then we do not need real synchronisation
+	// Because only the Distributor thread will be running
 	var lock sync.Locker
 	if d.keyChan != nil {
 		lock = &sync.Mutex{}
@@ -116,6 +91,8 @@ func distributor(p golParams, d distributorChans, alive chan []cell) {
 		go ticker(&state)
 	}
 
+	implementation := getImplementationFunction(p.implementation)
+
 	// Calculate the new state of Game of Life after the given number of turns.
 	turnLocal := 0
 	for turnLocal < p.turns {
@@ -125,7 +102,7 @@ func distributor(p golParams, d distributorChans, alive chan []cell) {
 		state.locker.Unlock()
 
 		//Perform the computation
-		worldLocal.computeStateUpdate()
+		implementation(&worldLocal)
 		turnLocal++
 
 		//Update the state with new world

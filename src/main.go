@@ -4,10 +4,11 @@ import "flag"
 
 // golParams provides the details of how to run the Game of Life and which image to load.
 type golParams struct {
-	turns       int
-	threads     int
-	imageWidth  int
-	imageHeight int
+	turns          int
+	threads        int
+	imageWidth     int
+	imageHeight    int
+	implementation string
 }
 
 // ioCommand allows requesting behaviour from the io (pgm) goroutine.
@@ -117,6 +118,12 @@ func main() {
 		"h",
 		512,
 		"Specify the height of the image. Defaults to 512.")
+
+	flag.StringVar(
+		&params.implementation,
+		"i",
+		ImplementationDefault.toString(),
+		"Specify the implementation to use.")
 
 	flag.Parse()
 
