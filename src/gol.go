@@ -50,10 +50,6 @@ type distributorState struct {
 }
 
 func handleKeyboard(state *distributorState, d distributorChans) {
-	// Guard if no keyboard connected; there will never be any input
-	if d.keyChan == nil {
-		return
-	}
 	for {
 		keyPress := <-d.keyChan
 		switch keyPress {
@@ -64,6 +60,8 @@ func handleKeyboard(state *distributorState, d distributorChans) {
 		case 'p':
 			state.locker.Lock()
 			fmt.Printf("Paused. Press p to continue...\n")
+			// Wait for p to be pressed again
+			// Whilst the mutex remains locked the GoL and Ticker threads will be stuck
 			for {
 				keyPress := <-d.keyChan
 				if keyPress == 'p' {
@@ -71,7 +69,6 @@ func handleKeyboard(state *distributorState, d distributorChans) {
 				}
 			}
 			fmt.Printf("Continuing...\n")
-			time.Sleep(500 * time.Millisecond)
 			state.locker.Unlock()
 		case 'q':
 			state.locker.Lock()
@@ -79,6 +76,19 @@ func handleKeyboard(state *distributorState, d distributorChans) {
 			exit()
 		}
 	}
+}
+
+func ticker(state *distributorState) {
+	ticker := time.NewTicker(2 * time.Second)
+	for {
+		<-ticker.C
+		state.locker.Lock()
+		world := state.currentWorld.Clone()
+		turn := state.currentTurn
+		state.locker.Unlock()
+		fmt.Printf("On turn: %d there are %d alive\n", turn, len(world.CalculateAlive()))
+	}
+
 }
 
 // distributor divides the work between workers and interacts with other goroutines.
@@ -89,10 +99,10 @@ func distributor(p golParams, d distributorChans, alive chan []cell) {
 	// If no keyboard is connected (e.g. testing) then we do not need synchronisation
 	// Because the keyboard thread won't be doing anything
 	var lock sync.Locker
-	if d.keyChan == nil {
-		lock = NopLocker{}
-	} else {
+	if d.keyChan != nil {
 		lock = &sync.Mutex{}
+	} else {
+		lock = NopLocker{}
 	}
 
 	state := distributorState{
@@ -101,12 +111,14 @@ func distributor(p golParams, d distributorChans, alive chan []cell) {
 		locker:       lock,
 	}
 
-	go handleKeyboard(&state, d)
+	if d.keyChan != nil {
+		go handleKeyboard(&state, d)
+		go ticker(&state)
+	}
 
 	// Calculate the new state of Game of Life after the given number of turns.
 	turnLocal := 0
 	for turnLocal < p.turns {
-		fmt.Printf("Starting %d\n", turnLocal)
 		//Clone the World into local memory
 		state.locker.Lock()
 		worldLocal := state.currentWorld.Clone()
@@ -116,7 +128,7 @@ func distributor(p golParams, d distributorChans, alive chan []cell) {
 		worldLocal.computeStateUpdate()
 		turnLocal++
 
-		//Update to the new state
+		//Update the state with new world
 		state.locker.Lock()
 		state.currentWorld = worldLocal
 		state.currentTurn = turnLocal

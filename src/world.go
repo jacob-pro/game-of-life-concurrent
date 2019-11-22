@@ -68,7 +68,8 @@ func LoadWorldFromPgm(height int, width int, d distributorChans) World {
 	return world
 }
 
-//Save a World to a PGM
+// Save a World to a PGM
+// The turn number is appended to the filename
 func (w *World) SaveToPgm(d distributorChans, turn int) {
 	d.io.command <- ioOutput
 	size := strings.Join([]string{strconv.Itoa(w.width), strconv.Itoa(w.height)}, "x")
