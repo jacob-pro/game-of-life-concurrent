@@ -33,21 +33,21 @@ type cell struct {
 // distributorToIo defines all chans that the distributor goroutine will have to communicate with the io goroutine.
 // Note the restrictions on chans being send-only or receive-only to prevent bugs.
 type distributorToIo struct {
-	command chan<- ioCommand
-	idle    <-chan bool
-
-	filename chan<- string
-	inputVal <-chan uint8
+	command   chan<- ioCommand
+	idle      <-chan bool
+	filename  chan<- string
+	inputVal  <-chan uint8
+	outputVal chan<- uint8
 }
 
 // ioToDistributor defines all chans that the io goroutine will have to communicate with the distributor goroutine.
 // Note the restrictions on chans being send-only or receive-only to prevent bugs.
 type ioToDistributor struct {
-	command <-chan ioCommand
-	idle    chan<- bool
-
-	filename <-chan string
-	inputVal chan<- uint8
+	command   <-chan ioCommand
+	idle      chan<- bool
+	filename  <-chan string
+	inputVal  chan<- uint8
+	outputVal <-chan uint8
 }
 
 // distributorChans stores all the chans that the distributor goroutine will use.
@@ -84,6 +84,10 @@ func gameOfLife(p golParams, keyChan <-chan rune) []cell {
 	inputVal := make(chan uint8)
 	dChans.io.inputVal = inputVal
 	ioChans.distributor.inputVal = inputVal
+
+	outputVal := make(chan uint8)
+	dChans.io.outputVal = outputVal
+	ioChans.distributor.outputVal = outputVal
 
 	dChans.keyChan = keyChan
 

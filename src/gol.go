@@ -58,7 +58,7 @@ func distributor(p golParams, d distributorChans, alive chan []cell) {
 		state.locker.Unlock()
 	}
 
-	// Make sure that the Io has finished any output before exiting.
+	// Make sure that the Io has finished any output before exiting (there may be a save in progress).
 	d.io.command <- ioCheckIdle
 	<-d.io.idle
 
@@ -91,6 +91,9 @@ func handleKeyboard(state *distributorState, d distributorChans) {
 		case 'q':
 			state.locker.Lock()
 			state.currentWorld.SaveToPgm(d, state.currentTurn)
+			// Make sure that the Io has finished any output before exiting (so that the save completes)
+			d.io.command <- ioCheckIdle
+			<-d.io.idle
 			exit()
 		}
 	}
@@ -113,10 +116,7 @@ func getImplementationFunction(name string) func(world *World, threads int) {
 		return ImplementationDefault.function()
 	} else {
 		impl, err := implementationFromName(name)
-		if err != nil {
-			panic(err)
-		} else {
-			return impl.function()
-		}
+		check(err)
+		return impl.function()
 	}
 }

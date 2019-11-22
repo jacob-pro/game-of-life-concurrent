@@ -15,7 +15,7 @@ type World struct {
 	matrix [][]byte
 }
 
-//Create a new empty World
+// Create a new empty World
 func NewWorld(height int, width int) World {
 	matrix := make([][]byte, height)
 	for i := range matrix {
@@ -37,7 +37,7 @@ func (w *World) Iterate(closure func(y int, x int, value byte)) {
 	}
 }
 
-//Creates a clone of a World (separate memory)
+// Create a clone of a World (separate memory)
 func (w *World) Clone() World {
 	newW := NewWorld(w.height, w.width)
 	w.Iterate(func(y int, x int, value byte) {
@@ -46,26 +46,24 @@ func (w *World) Clone() World {
 	return newW
 }
 
-//Load a World from a PGM
+// Load a World from a PGM
 func LoadWorldFromPgm(height int, width int, d distributorChans) World {
-	world := NewWorld(height, width)
+	w := NewWorld(height, width)
 
 	// Request the io goroutine to read in the image with the given filename.
 	d.io.command <- ioInput
-	d.io.filename <- strings.Join([]string{strconv.Itoa(world.width), strconv.Itoa(world.height)}, "x")
+	d.io.filename <- strings.Join([]string{strconv.Itoa(w.width), strconv.Itoa(w.height)}, "x")
 
 	// The io goroutine sends the requested image byte by byte, in rows.
-	for y := 0; y < world.height; y++ {
-		for x := 0; x < world.width; x++ {
-			val := <-d.io.inputVal
-			if val != 0 {
-				//fmt.Println("Alive cell at", x, y)
-				world.matrix[y][x] = val
-			}
+	w.Iterate(func(y int, x int, _ byte) {
+		val := <-d.io.inputVal
+		if val != 0 {
+			//fmt.Println("Alive cell at", x, y)
+			w.matrix[y][x] = val
 		}
-	}
+	})
 
-	return world
+	return w
 }
 
 // Save a World to a PGM
@@ -75,7 +73,7 @@ func (w *World) SaveToPgm(d distributorChans, turn int) {
 	size := strings.Join([]string{strconv.Itoa(w.width), strconv.Itoa(w.height)}, "x")
 	d.io.filename <- fmt.Sprintf("%s_turn_%d", size, turn)
 	w.Iterate(func(y int, x int, value byte) {
-
+		d.io.outputVal <- value
 	})
 }
 
