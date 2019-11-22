@@ -46,19 +46,23 @@ func (w *World) computeStateUpdate() {
 type distributorState struct {
 	currentTurn  int
 	currentWorld World
-	mux          sync.Mutex
+	locker       sync.Locker
 }
 
 func handleKeyboard(state *distributorState, d distributorChans) {
+	// Guard if no keyboard connected; there will never be any input
+	if d.keyChan == nil {
+		return
+	}
 	for {
 		keyPress := <-d.keyChan
 		switch keyPress {
 		case 's':
-			state.mux.Lock()
+			state.locker.Lock()
 			state.currentWorld.SaveToPgm(d, state.currentTurn)
-			state.mux.Unlock()
+			state.locker.Unlock()
 		case 'p':
-			state.mux.Lock()
+			state.locker.Lock()
 			fmt.Printf("Paused. Press p to continue...\n")
 			for {
 				keyPress := <-d.keyChan
@@ -68,9 +72,9 @@ func handleKeyboard(state *distributorState, d distributorChans) {
 			}
 			fmt.Printf("Continuing...\n")
 			time.Sleep(500 * time.Millisecond)
-			state.mux.Unlock()
+			state.locker.Unlock()
 		case 'q':
-			state.mux.Lock()
+			state.locker.Lock()
 			state.currentWorld.SaveToPgm(d, state.currentTurn)
 			exit()
 		}
@@ -78,12 +82,23 @@ func handleKeyboard(state *distributorState, d distributorChans) {
 }
 
 // distributor divides the work between workers and interacts with other goroutines.
+// d.keyChan is nil when launched by the test framework
 func distributor(p golParams, d distributorChans, alive chan []cell) {
+
+	// The state lock is used to synchronise the GoL algorithm and keyboard actions
+	// If no keyboard is connected (e.g. testing) then we do not need synchronisation
+	// Because the keyboard thread won't be doing anything
+	var lock sync.Locker
+	if d.keyChan == nil {
+		lock = NopLocker{}
+	} else {
+		lock = &sync.Mutex{}
+	}
 
 	state := distributorState{
 		currentTurn:  0,
 		currentWorld: LoadWorldFromPgm(p.imageHeight, p.imageWidth, d),
-		mux:          sync.Mutex{},
+		locker:       lock,
 	}
 
 	go handleKeyboard(&state, d)
@@ -93,19 +108,19 @@ func distributor(p golParams, d distributorChans, alive chan []cell) {
 	for turnLocal < p.turns {
 		fmt.Printf("Starting %d\n", turnLocal)
 		//Clone the World into local memory
-		state.mux.Lock()
+		state.locker.Lock()
 		worldLocal := state.currentWorld.Clone()
-		state.mux.Unlock()
+		state.locker.Unlock()
 
 		//Perform the computation
 		worldLocal.computeStateUpdate()
 		turnLocal++
 
 		//Update to the new state
-		state.mux.Lock()
+		state.locker.Lock()
 		state.currentWorld = worldLocal
 		state.currentTurn = turnLocal
-		state.mux.Unlock()
+		state.locker.Unlock()
 	}
 
 	// Make sure that the Io has finished any output before exiting.
@@ -113,6 +128,6 @@ func distributor(p golParams, d distributorChans, alive chan []cell) {
 	<-d.io.idle
 
 	// Return the coordinates of cells that are still alive.
-	state.mux.Lock()
+	state.locker.Lock()
 	alive <- state.currentWorld.CalculateAlive()
 }
