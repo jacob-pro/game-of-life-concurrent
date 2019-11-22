@@ -25,7 +25,7 @@ func implementationFromName(s string) (Implementation, error) {
 	}
 }
 
-func (i Implementation) function() func(*World) {
+func (i Implementation) function() func(world *World, threads int) {
 	switch i {
 	case ImplementationSerial:
 		return updateWorldSerially

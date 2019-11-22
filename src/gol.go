@@ -48,7 +48,7 @@ func distributor(p golParams, d distributorChans, alive chan []cell) {
 		state.locker.Unlock()
 
 		//Perform the computation
-		f(&worldLocal)
+		f(&worldLocal, p.threads)
 		turnLocal++
 
 		//Update the state with new world
@@ -108,7 +108,7 @@ func ticker(state *distributorState) {
 	}
 }
 
-func getImplementationFunction(name string) func(*World) {
+func getImplementationFunction(name string) func(world *World, threads int) {
 	if name == "" {
 		return ImplementationDefault.function()
 	} else {
