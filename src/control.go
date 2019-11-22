@@ -38,7 +38,7 @@ func startControlServer(p golParams) {
 	fmt.Println("Threads:", p.threads)
 	fmt.Println("Width:", p.imageWidth)
 	fmt.Println("Height:", p.imageHeight)
-	fmt.Println("Implementation:", p.implementation)
+	fmt.Println("Implementation:", p.implementationName)
 
 }
 

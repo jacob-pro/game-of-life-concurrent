@@ -10,6 +10,7 @@ func customMod(index int, max int) int {
 	}
 }
 
+// Stage 1a single threaded implementationName
 func updateWorldSerially(w *World) {
 	clone := w.Clone()
 	for y := 0; y < clone.height; y++ {

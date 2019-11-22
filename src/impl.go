@@ -15,13 +15,13 @@ const (
 const ImplementationDefault Implementation = ImplementationSerial
 
 // This is case insensitive
-func implementationFromString(s string) (Implementation, error) {
+func implementationFromName(s string) (Implementation, error) {
 	s = strings.ToLower(s)
 	switch s {
 	case "serial":
 		return ImplementationSerial, nil
 	default:
-		return 0, errors.New("invalid implementation string")
+		return 0, errors.New("invalid implementationName string")
 	}
 }
 
@@ -33,7 +33,7 @@ func (i Implementation) function() func(*World) {
 	panic("unmatched case")
 }
 
-func (i Implementation) toString() string {
+func (i Implementation) name() string {
 	switch i {
 	case ImplementationSerial:
 		return "Serial"

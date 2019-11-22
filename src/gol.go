@@ -12,6 +12,61 @@ type distributorState struct {
 	locker       sync.Locker
 }
 
+// distributor divides the work between workers and interacts with other goroutines.
+// d.keyChan is nil when launched by the test framework
+func distributor(p golParams, d distributorChans, alive chan []cell) {
+
+	// The state lock is used to synchronise the Distributor, Keyboard, and Ticker threads.
+	// If no user is connected (e.g. testing/benchmark) then we do not need real synchronisation
+	// Because only the Distributor thread will be running
+	var lock sync.Locker
+	if d.keyChan != nil {
+		lock = &sync.Mutex{}
+	} else {
+		lock = NopLocker{}
+	}
+
+	state := distributorState{
+		currentTurn:  0,
+		currentWorld: LoadWorldFromPgm(p.imageHeight, p.imageWidth, d),
+		locker:       lock,
+	}
+
+	if d.keyChan != nil {
+		go handleKeyboard(&state, d)
+		go ticker(&state)
+	}
+
+	f := getImplementationFunction(p.implementationName)
+
+	// Calculate the new state of Game of Life after the given number of turns.
+	turnLocal := 0
+	for turnLocal < p.turns {
+		//Clone the World into local memory
+		state.locker.Lock()
+		worldLocal := state.currentWorld.Clone()
+		state.locker.Unlock()
+
+		//Perform the computation
+		f(&worldLocal)
+		turnLocal++
+
+		//Update the state with new world
+		state.locker.Lock()
+		state.currentWorld = worldLocal
+		state.currentTurn = turnLocal
+		state.locker.Unlock()
+	}
+
+	// Make sure that the Io has finished any output before exiting.
+	d.io.command <- ioCheckIdle
+	<-d.io.idle
+
+	// Return the coordinates of cells that are still alive.
+	state.locker.Lock()
+	alive <- state.currentWorld.CalculateAlive()
+}
+
 func handleKeyboard(state *distributorState, d distributorChans) {
 	for {
 		keyPress := <-d.keyChan
@@ -53,70 +108,15 @@ func ticker(state *distributorState) {
 	}
 }
 
-func getImplementationFunction(s string) func(*World) {
-	if s == "" {
+func getImplementationFunction(name string) func(*World) {
+	if name == "" {
 		return ImplementationDefault.function()
 	} else {
-		impl, err := implementationFromString(s)
+		impl, err := implementationFromName(name)
 		if err != nil {
 			panic(err)
 		} else {
 			return impl.function()
 		}
 	}
-}
-
-// distributor divides the work between workers and interacts with other goroutines.
-// d.keyChan is nil when launched by the test framework
-func distributor(p golParams, d distributorChans, alive chan []cell) {
-
-	// The state lock is used to synchronise the Distributor, Keyboard, and Ticker threads.
-	// If no user is connected (e.g. testing/benchmark) then we do not need real synchronisation
-	// Because only the Distributor thread will be running
-	var lock sync.Locker
-	if d.keyChan != nil {
-		lock = &sync.Mutex{}
-	} else {
-		lock = NopLocker{}
-	}
-
-	state := distributorState{
-		currentTurn:  0,
-		currentWorld: LoadWorldFromPgm(p.imageHeight, p.imageWidth, d),
-		locker:       lock,
-	}
-
-	if d.keyChan != nil {
-		go handleKeyboard(&state, d)
-		go ticker(&state)
-	}
-
-	implementation := getImplementationFunction(p.implementation)
-
-	// Calculate the new state of Game of Life after the given number of turns.
-	turnLocal := 0
-	for turnLocal < p.turns {
-		//Clone the World into local memory
-		state.locker.Lock()
-		worldLocal := state.currentWorld.Clone()
-		state.locker.Unlock()
-
-		//Perform the computation
-		implementation(&worldLocal)
-		turnLocal++
-
-		//Update the state with new world
-		state.locker.Lock()
-		state.currentWorld = worldLocal
-		state.currentTurn = turnLocal
-		state.locker.Unlock()
-	}
-
-	// Make sure that the Io has finished any output before exiting.
-	d.io.command <- ioCheckIdle
-	<-d.io.idle
-
-	// Return the coordinates of cells that are still alive.
-	state.locker.Lock()
-	alive <- state.currentWorld.CalculateAlive()
 }
