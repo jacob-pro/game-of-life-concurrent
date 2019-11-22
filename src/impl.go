@@ -21,7 +21,7 @@ func implementationFromName(s string) (Implementation, error) {
 	case "serial":
 		return ImplementationSerial, nil
 	default:
-		return 0, errors.New("invalid implementationName string")
+		return 0, errors.New("invalid implementation name")
 	}
 }
 
