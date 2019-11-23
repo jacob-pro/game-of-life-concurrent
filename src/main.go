@@ -4,10 +4,11 @@ import "flag"
 
 // golParams provides the details of how to run the Game of Life and which image to load.
 type golParams struct {
-	turns       int
-	threads     int
-	imageWidth  int
-	imageHeight int
+	turns              int
+	threads            int
+	imageWidth         int
+	imageHeight        int
+	implementationName string
 }
 
 // ioCommand allows requesting behaviour from the io (pgm) goroutine.
@@ -32,26 +33,27 @@ type cell struct {
 // distributorToIo defines all chans that the distributor goroutine will have to communicate with the io goroutine.
 // Note the restrictions on chans being send-only or receive-only to prevent bugs.
 type distributorToIo struct {
-	command chan<- ioCommand
-	idle    <-chan bool
-
-	filename chan<- string
-	inputVal <-chan uint8
+	command   chan<- ioCommand
+	idle      <-chan bool
+	filename  chan<- string
+	inputVal  <-chan uint8
+	outputVal chan<- uint8
 }
 
 // ioToDistributor defines all chans that the io goroutine will have to communicate with the distributor goroutine.
 // Note the restrictions on chans being send-only or receive-only to prevent bugs.
 type ioToDistributor struct {
-	command <-chan ioCommand
-	idle    chan<- bool
-
-	filename <-chan string
-	inputVal chan<- uint8
+	command   <-chan ioCommand
+	idle      chan<- bool
+	filename  <-chan string
+	inputVal  chan<- uint8
+	outputVal <-chan uint8
 }
 
 // distributorChans stores all the chans that the distributor goroutine will use.
 type distributorChans struct {
-	io distributorToIo
+	io      distributorToIo
+	keyChan <-chan rune
 }
 
 // ioChans stores all the chans that the io goroutine will use.
@@ -82,6 +84,12 @@ func gameOfLife(p golParams, keyChan <-chan rune) []cell {
 	inputVal := make(chan uint8)
 	dChans.io.inputVal = inputVal
 	ioChans.distributor.inputVal = inputVal
+
+	outputVal := make(chan uint8)
+	dChans.io.outputVal = outputVal
+	ioChans.distributor.outputVal = outputVal
+
+	dChans.keyChan = keyChan
 
 	aliveCells := make(chan []cell)
 
@@ -115,12 +123,19 @@ func main() {
 		512,
 		"Specify the height of the image. Defaults to 512.")
 
+	flag.StringVar(
+		&params.implementationName,
+		"i",
+		ImplementationDefault.name(),
+		"Specify the implementation to use.")
+
 	flag.Parse()
 
 	params.turns = 10000000000
 
 	startControlServer(params)
-	go getKeyboardCommand(nil)
-	gameOfLife(params, nil)
+	keyChan := make(chan rune)
+	go getKeyboardCommand(keyChan)
+	gameOfLife(params, keyChan)
 	StopControlServer()
 }

@@ -6,6 +6,11 @@ import (
 	"os"
 )
 
+func exit() {
+	StopControlServer()
+	os.Exit(0)
+}
+
 // getKeyboardCommand sends all keys pressed on the keyboard as runes (characters) on the key chan.
 // getKeyboardCommand will NOT work if termbox isn't initialised (in startControlServer)
 func getKeyboardCommand(key chan<- rune) {
@@ -13,8 +18,7 @@ func getKeyboardCommand(key chan<- rune) {
 		event := termbox.PollEvent()
 		if event.Type == termbox.EventKey {
 			if event.Key == termbox.KeyCtrlC {
-				StopControlServer()
-				os.Exit(0)
+				exit()
 			} else if key != nil {
 				if event.Key != 0 {
 					key <- rune(event.Key)
@@ -34,6 +38,8 @@ func startControlServer(p golParams) {
 	fmt.Println("Threads:", p.threads)
 	fmt.Println("Width:", p.imageWidth)
 	fmt.Println("Height:", p.imageHeight)
+	fmt.Println("Implementation:", p.implementationName)
+
 }
 
 // stopControlServer closes termbox.

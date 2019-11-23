@@ -2,126 +2,121 @@ package main
 
 import (
 	"fmt"
-	"strconv"
-	"strings"
+	"sync"
+	"time"
 )
 
-const ALIVE byte = 0xFF
-const DEAD byte = 0x00
-
-type world struct {
-	width  int
-	height int
-	matrix [][]byte
-}
-
-func newWorld(height int, width int) world {
-	matrix := make([][]byte, height)
-	for i := range matrix {
-		matrix[i] = make([]byte, width)
-	}
-	world := world{
-		width:  width,
-		height: height,
-		matrix: matrix,
-	}
-	return world
-}
-
-func loadWorldFromPGM(world *world, d distributorChans) {
-	// Request the io goroutine to read in the image with the given filename.
-	d.io.command <- ioInput
-	d.io.filename <- strings.Join([]string{strconv.Itoa(world.width), strconv.Itoa(world.height)}, "x")
-
-	// The io goroutine sends the requested image byte by byte, in rows.
-	for y := 0; y < world.height; y++ {
-		for x := 0; x < world.width; x++ {
-			val := <-d.io.inputVal
-			if val != 0 {
-				fmt.Println("Alive cell at", x, y)
-				world.matrix[y][x] = val
-			}
-		}
-	}
-}
-
-func cloneWorld(original *world) world {
-	newW := newWorld(original.height, original.width)
-	for y := 0; y < original.height; y++ {
-		for x := 0; x < original.width; x++ {
-			newW.matrix[y][x] = original.matrix[y][x]
-		}
-	}
-	return newW
-}
-
-func customMod(index int, max int) int {
-	if index >= max {
-		return index - max
-	} else if index < 0 {
-		return index + max
-	} else {
-		return index
-	}
-}
-
-func updateWorldState(original *world) world {
-	clone := cloneWorld(original)
-	for y := 0; y < original.height; y++ {
-		for x := 0; x < original.width; x++ {
-			var neighboursAlive = 0
-			//Count alive cells in 3x3 grid
-			for i := y - 1; i <= y+1; i++ {
-				for j := x - 1; j <= x+1; j++ {
-					if original.matrix[customMod(i, original.height)][customMod(j, original.width)] == ALIVE {
-						neighboursAlive++
-					}
-				}
-			}
-			if original.matrix[y][x] == ALIVE {
-				neighboursAlive--
-				if neighboursAlive == 2 || neighboursAlive == 3 {
-					clone.matrix[y][x] = ALIVE
-				} else {
-					clone.matrix[y][x] = DEAD
-				}
-			} else if neighboursAlive == 3 {
-				clone.matrix[y][x] = ALIVE
-			}
-		}
-	}
-	return clone
-}
-
-func calculateAlive(world *world) []cell {
-	// Create an empty slice to store coordinates of cells that are still alive after p.turns are done.
-	var finalAlive []cell
-	// Go through the world and append the cells that are still alive.
-	for y := 0; y < world.height; y++ {
-		for x := 0; x < world.width; x++ {
-			if world.matrix[y][x] != 0 {
-				finalAlive = append(finalAlive, cell{x: x, y: y})
-			}
-		}
-	}
-	return finalAlive
+type distributorState struct {
+	currentTurn  int
+	currentWorld World
+	locker       sync.Locker
 }
 
 // distributor divides the work between workers and interacts with other goroutines.
+// d.keyChan is nil when launched by the test framework
 func distributor(p golParams, d distributorChans, alive chan []cell) {
 
-	var world = newWorld(p.imageHeight, p.imageWidth)
-	loadWorldFromPGM(&world, d)
-
-	// Calculate the new state of Game of Life after the given number of turns.
-	for turns := 0; turns < p.turns; turns++ {
-		world = updateWorldState(&world)
+	// The state lock is used to synchronise the Distributor, Keyboard, and Ticker threads.
+	// If no user is connected (e.g. testing/benchmark) then we do not need real synchronisation
+	// Because only the Distributor thread will be running
+	var lock sync.Locker
+	if d.keyChan != nil {
+		lock = &sync.Mutex{}
+	} else {
+		lock = NopLocker{}
 	}
 
-	// Make sure that the Io has finished any output before exiting.
+	state := distributorState{
+		currentTurn:  0,
+		currentWorld: LoadWorldFromPgm(p.imageHeight, p.imageWidth, d),
+		locker:       lock,
+	}
+
+	if d.keyChan != nil {
+		go handleKeyboard(&state, d)
+		go ticker(&state)
+	}
+
+	f := getImplementationFunction(p.implementationName)
+
+	// Calculate the new state of Game of Life after the given number of turns.
+	turnLocal := 0
+	for turnLocal < p.turns {
+		//Clone the World into local memory
+		state.locker.Lock()
+		worldLocal := state.currentWorld.Clone()
+		state.locker.Unlock()
+
+		//Perform the computation
+		f(&worldLocal, p.threads)
+		turnLocal++
+
+		//Update the state with new world
+		state.locker.Lock()
+		state.currentWorld = worldLocal
+		state.currentTurn = turnLocal
+		state.locker.Unlock()
+	}
+
+	// Make sure that the Io has finished any output before exiting (there may be a save in progress).
 	d.io.command <- ioCheckIdle
 	<-d.io.idle
 
 	// Return the coordinates of cells that are still alive.
-	alive <- calculateAlive(&world)
+	state.locker.Lock()
+	alive <- state.currentWorld.CalculateAlive()
+}
+
+func handleKeyboard(state *distributorState, d distributorChans) {
+	for {
+		keyPress := <-d.keyChan
+		switch keyPress {
+		case 's':
+			state.locker.Lock()
+			state.currentWorld.SaveToPgm(d, state.currentTurn)
+			state.locker.Unlock()
+		case 'p':
+			state.locker.Lock()
+			fmt.Printf("Paused. Press p to continue...\n")
+			// Wait for p to be pressed again
+			// Whilst the mutex remains locked the GoL and Ticker threads will be stuck
+			for {
+				keyPress := <-d.keyChan
+				if keyPress == 'p' {
+					break
+				}
+			}
+			fmt.Printf("Continuing...\n")
+			state.locker.Unlock()
+		case 'q':
+			state.locker.Lock()
+			state.currentWorld.SaveToPgm(d, state.currentTurn)
+			// Make sure that the Io has finished any output before exiting (so that the save completes)
+			d.io.command <- ioCheckIdle
+			<-d.io.idle
+			exit()
+		}
+	}
+}
+
+func ticker(state *distributorState) {
+	ticker := time.NewTicker(2 * time.Second)
+	for {
+		<-ticker.C
+		state.locker.Lock()
+		world := state.currentWorld.Clone()
+		turn := state.currentTurn
+		state.locker.Unlock()
+		fmt.Printf("On turn: %d there are %d alive\n", turn, len(world.CalculateAlive()))
+	}
+}
+
+func getImplementationFunction(name string) func(world *World, threads int) {
+	if name == "" {
+		return ImplementationDefault.function()
+	} else {
+		impl, err := implementationFromName(name)
+		check(err)
+		return impl.function()
+	}
 }
