@@ -6,10 +6,11 @@ import (
 	"time"
 )
 
+// The state should be locked before any read/writes to the implementation or current turn
 type distributorState struct {
-	currentTurn  int
-	currentWorld World
-	locker       sync.Locker
+	currentTurn int
+	impl        Implementation
+	locker      sync.Locker
 }
 
 // distributor divides the work between workers and interacts with other goroutines.
@@ -26,10 +27,13 @@ func distributor(p golParams, d distributorChans, alive chan []cell) {
 		lock = NopLocker{}
 	}
 
+	i := getImplementation(p.implementationName)
+	i.Init(LoadWorldFromPgm(p.imageHeight, p.imageWidth, d), p.threads)
+
 	state := distributorState{
-		currentTurn:  0,
-		currentWorld: LoadWorldFromPgm(p.imageHeight, p.imageWidth, d),
-		locker:       lock,
+		currentTurn: 0,
+		impl:        i,
+		locker:      lock,
 	}
 
 	if d.keyChan != nil {
@@ -37,23 +41,11 @@ func distributor(p golParams, d distributorChans, alive chan []cell) {
 		go ticker(&state)
 	}
 
-	f := getImplementationFunction(p.implementationName)
-
-	// Calculate the new state of Game of Life after the given number of turns.
 	turnLocal := 0
 	for turnLocal < p.turns {
-		//Clone the World into local memory
 		state.locker.Lock()
-		worldLocal := state.currentWorld.Clone()
-		state.locker.Unlock()
-
-		//Perform the computation
-		f(&worldLocal, p.threads)
+		state.impl.NextTurn()
 		turnLocal++
-
-		//Update the state with new world
-		state.locker.Lock()
-		state.currentWorld = worldLocal
 		state.currentTurn = turnLocal
 		state.locker.Unlock()
 	}
@@ -64,7 +56,8 @@ func distributor(p golParams, d distributorChans, alive chan []cell) {
 
 	// Return the coordinates of cells that are still alive.
 	state.locker.Lock()
-	alive <- state.currentWorld.CalculateAlive()
+	w := state.impl.GetWorld()
+	alive <- w.CalculateAlive()
 }
 
 func handleKeyboard(state *distributorState, d distributorChans) {
@@ -73,8 +66,10 @@ func handleKeyboard(state *distributorState, d distributorChans) {
 		switch keyPress {
 		case 's':
 			state.locker.Lock()
-			state.currentWorld.SaveToPgm(d, state.currentTurn)
+			w := state.impl.GetWorld()
+			t := state.currentTurn
 			state.locker.Unlock()
+			w.SaveToPgm(d, t)
 		case 'p':
 			state.locker.Lock()
 			fmt.Printf("Paused. Press p to continue...\n")
@@ -90,7 +85,8 @@ func handleKeyboard(state *distributorState, d distributorChans) {
 			state.locker.Unlock()
 		case 'q':
 			state.locker.Lock()
-			state.currentWorld.SaveToPgm(d, state.currentTurn)
+			w := state.impl.GetWorld()
+			w.SaveToPgm(d, state.currentTurn)
 			// Make sure that the Io has finished any output before exiting (so that the save completes)
 			d.io.command <- ioCheckIdle
 			<-d.io.idle
@@ -104,19 +100,19 @@ func ticker(state *distributorState) {
 	for {
 		<-ticker.C
 		state.locker.Lock()
-		world := state.currentWorld.Clone()
+		world := state.impl.GetWorld()
 		turn := state.currentTurn
 		state.locker.Unlock()
 		fmt.Printf("On turn: %d there are %d alive\n", turn, len(world.CalculateAlive()))
 	}
 }
 
-func getImplementationFunction(name string) func(world *World, threads int) {
+func getImplementation(name string) Implementation {
 	if name == "" {
-		return ImplementationDefault.function()
+		return ImplementationDefault.new()
 	} else {
 		impl, err := implementationFromName(name)
 		check(err)
-		return impl.function()
+		return impl.new()
 	}
 }
