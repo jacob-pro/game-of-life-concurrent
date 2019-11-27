@@ -1,8 +1,8 @@
 package main
 
 // #cgo CFLAGS: -I../rust/include
-// #cgo LDFLAGS: ../rust/target/release/gol_rust.lib -lws2_32 -luserenv
-// #cgo linux darwin LDFLAGS: ../rust/target/release/gol_rust.a
+// #cgo windows LDFLAGS: ../rust/target/release/gol_rust.lib -lws2_32 -luserenv
+// #cgo linux darwin LDFLAGS: ../rust/target/release/libgol_rust.a -ldl
 // #include <gol.h>
 import "C"
 
