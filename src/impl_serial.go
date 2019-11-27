@@ -5,8 +5,8 @@ type Serial struct {
 	world World
 }
 
-func (s *Serial) Init(world World, _ int) {
-	s.world = world
+func InitSerial(world World, _ int) Implementation {
+	return &Serial{world}
 }
 
 func (s *Serial) NextTurn() {
@@ -18,3 +18,5 @@ func (s *Serial) NextTurn() {
 func (s *Serial) GetWorld() World {
 	return s.world.Clone()
 }
+
+func (p *Serial) Close() {}

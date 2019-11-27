@@ -6,26 +6,29 @@ type Parallel struct {
 	workers []workerExternal
 }
 
-func (p *Parallel) Init(world World, threads int) {
-	p.world = world
-
-	s := rowsForEachThread(threads, p.world.height)
-	p.workers = make([]workerExternal, threads)
+func InitParallel(world World, threads int) Implementation {
+	s := rowsForEachThread(threads, world.height)
+	workers := make([]workerExternal, threads)
 	for i, rows := range s {
 		input := make(chan byte)
 		result := make(chan byte)
-		p.workers[i] = workerExternal{
+		workers[i] = workerExternal{
 			rows:          rows,
 			sendInput:     input,
 			receiveResult: result,
 		}
 		x := workerInternal{
 			rows:         rows,
-			width:        p.world.width,
+			width:        world.width,
 			receiveInput: input,
 			sendResult:   result,
 		}
 		go parallelWorker(x)
+	}
+
+	return &Parallel{
+		world:   world,
+		workers: workers,
 	}
 }
 
@@ -103,3 +106,5 @@ func (p *Parallel) NextTurn() {
 func (p *Parallel) GetWorld() World {
 	return p.world.Clone()
 }
+
+func (p *Parallel) Close() {}

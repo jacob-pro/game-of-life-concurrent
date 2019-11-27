@@ -6,12 +6,14 @@ import (
 )
 
 type Implementation interface {
-	Init(world World, threads int)
 	NextTurn()
 	GetWorld() World
+	Close()
 }
 
 type ImplementationEnum int
+
+type ImplementationInitFn func(world World, threads int) Implementation
 
 // An enum that represents the different GoL implementations
 const (
@@ -19,9 +21,10 @@ const (
 	ImplementationParallel
 	ImplementationParallelShared
 	ImplementationHalo
+	ImplementationRust
 )
 
-const ImplementationDefault ImplementationEnum = ImplementationParallel
+const ImplementationDefault ImplementationEnum = ImplementationRust
 
 // This is case insensitive
 func implementationFromName(s string) (ImplementationEnum, error) {
@@ -35,19 +38,23 @@ func implementationFromName(s string) (ImplementationEnum, error) {
 		return ImplementationParallelShared, nil
 	case "halo":
 		return ImplementationHalo, nil
+	case "rust":
+		return ImplementationRust, nil
 	default:
 		return 0, errors.New("invalid implementation name")
 	}
 }
 
-func (i ImplementationEnum) new() Implementation {
+func (i ImplementationEnum) initFn() ImplementationInitFn {
 	switch i {
 	case ImplementationSerial:
-		return &Serial{}
+		return InitSerial
 	case ImplementationParallel:
-		return &Parallel{}
+		return InitParallel
 	case ImplementationParallelShared:
-		return &ParallelShared{}
+		return InitParallelShared
+	case ImplementationRust:
+		return InitRust
 	}
 	panic("unmatched case")
 }
@@ -62,6 +69,8 @@ func (i ImplementationEnum) name() string {
 		return "ParallelShared"
 	case ImplementationHalo:
 		return "Halo"
+	case ImplementationRust:
+		return "Rust"
 	}
 	panic("unmatched case")
 }

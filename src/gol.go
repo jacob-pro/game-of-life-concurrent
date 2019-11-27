@@ -27,8 +27,7 @@ func distributor(p golParams, d distributorChans, alive chan []cell) {
 		lock = NopLocker{}
 	}
 
-	i := getImplementation(p.implementationName)
-	i.Init(LoadWorldFromPgm(p.imageHeight, p.imageWidth, d), p.threads)
+	i := getInitFn(p.implementationName)(LoadWorldFromPgm(p.imageHeight, p.imageWidth, d), p.threads)
 
 	state := distributorState{
 		currentTurn: 0,
@@ -58,6 +57,8 @@ func distributor(p golParams, d distributorChans, alive chan []cell) {
 	state.locker.Lock()
 	w := state.impl.GetWorld()
 	alive <- w.CalculateAlive()
+
+	state.impl.Close()
 }
 
 func handleKeyboard(state *distributorState, d distributorChans) {
@@ -107,12 +108,12 @@ func ticker(state *distributorState) {
 	}
 }
 
-func getImplementation(name string) Implementation {
+func getInitFn(name string) ImplementationInitFn {
 	if name == "" {
-		return ImplementationDefault.new()
+		return ImplementationDefault.initFn()
 	} else {
 		impl, err := implementationFromName(name)
 		check(err)
-		return impl.new()
+		return impl.initFn()
 	}
 }

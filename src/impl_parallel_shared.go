@@ -10,9 +10,11 @@ type ParallelShared struct {
 	rowsForEachThread []int
 }
 
-func (p *ParallelShared) Init(world World, threads int) {
-	p.world = world
-	p.rowsForEachThread = rowsForEachThread(threads, p.world.height)
+func InitParallelShared(world World, threads int) Implementation {
+	return &ParallelShared{
+		world:             world,
+		rowsForEachThread: rowsForEachThread(threads, world.height),
+	}
 }
 
 type parallelCell struct {
@@ -24,7 +26,6 @@ type parallelCell struct {
 // GoL for one cell
 func (p *parallelCell) compute(wg *sync.WaitGroup, world *World) {
 	defer wg.Done()
-
 	p.result = gameOfLifeTurn(func(i int) []byte {
 		return world.matrix[customMod(i+p.offset, world.height)]
 	}, p.rows, world.width)
@@ -63,3 +64,5 @@ func (p *ParallelShared) NextTurn() {
 func (p *ParallelShared) GetWorld() World {
 	return p.world.Clone()
 }
+
+func (p *ParallelShared) Close() {}
