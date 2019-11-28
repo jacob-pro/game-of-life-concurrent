@@ -4,14 +4,14 @@ import (
 	"sync"
 )
 
-// An alternative version of the stage 1b parallel but using shared memory
-type ParallelShared struct {
-	world             World
+// Stage 5 option 1, parallel using shared memory
+type parallelShared struct {
+	world             world
 	rowsForEachThread []int
 }
 
-func InitParallelShared(world World, threads int) Implementation {
-	return &ParallelShared{
+func initParallelShared(world world, threads int) implementation {
+	return &parallelShared{
 		world:             world,
 		rowsForEachThread: rowsForEachThread(threads, world.height),
 	}
@@ -24,14 +24,14 @@ type parallelCell struct {
 }
 
 // GoL for one cell
-func (p *parallelCell) compute(wg *sync.WaitGroup, world *World) {
+func (p *parallelCell) compute(wg *sync.WaitGroup, world *world) {
 	defer wg.Done()
 	p.result = gameOfLifeTurn(func(i int) []byte {
 		return world.matrix[customMod(i+p.offset, world.height)]
 	}, p.rows, world.width)
 }
 
-func (p *ParallelShared) NextTurn() {
+func (p *parallelShared) nextTurn() {
 
 	// Split the world into cells
 	cells := make([]*parallelCell, len(p.rowsForEachThread))
@@ -61,8 +61,8 @@ func (p *ParallelShared) NextTurn() {
 	p.world.matrix = result
 }
 
-func (p *ParallelShared) GetWorld() World {
-	return p.world.Clone()
+func (p *parallelShared) getWorld() world {
+	return p.world.clone()
 }
 
-func (p *ParallelShared) Close() {}
+func (p *parallelShared) close() {}

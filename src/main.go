@@ -126,7 +126,7 @@ func main() {
 	flag.StringVar(
 		&params.implementationName,
 		"i",
-		ImplementationDefault.name(),
+		implementationDefault.name(),
 		"Specify the implementation to use.")
 
 	flag.Parse()
