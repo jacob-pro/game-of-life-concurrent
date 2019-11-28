@@ -7,13 +7,13 @@ package main
 import "C"
 
 // Stage 5 some crazy shit
-type Rust struct {
+type rust struct {
 	gol    *C.GameOfLife
 	height int
 	width  int
 }
 
-func InitRust(world World, threads int) Implementation {
+func initRust(world world, threads int) implementation {
 	// Flatten the world
 	var k []byte
 	for _, v := range world.matrix {
@@ -22,18 +22,18 @@ func InitRust(world World, threads int) Implementation {
 	//noinspection ALL
 	gol := C.gol_init((*C.uchar)(&k[0]), C.int32_t(world.height), C.int32_t(world.width), C.int32_t(threads))
 
-	return &Rust{
+	return &rust{
 		gol:    gol,
 		height: world.height,
 		width:  world.width,
 	}
 }
 
-func (r *Rust) NextTurn() {
+func (r *rust) nextTurn() {
 	C.gol_next_turn(r.gol)
 }
 
-func (r *Rust) GetWorld() World {
+func (r *rust) getWorld() world {
 	// Load the world into a slice
 	b := make([]byte, r.width*r.height)
 	C.gol_get_world(r.gol, (*C.uchar)(&b[0]))
@@ -46,13 +46,13 @@ func (r *Rust) GetWorld() World {
 		unflat[i] = b[start:end]
 	}
 
-	return World{
+	return world{
 		width:  r.width,
 		height: r.height,
 		matrix: unflat,
 	}
 }
 
-func (r *Rust) Close() {
+func (r *rust) close() {
 	C.gol_destroy(r.gol)
 }

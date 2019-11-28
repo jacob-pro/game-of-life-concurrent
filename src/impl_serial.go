@@ -1,22 +1,22 @@
 package main
 
 // Stage 1a single threaded implementation
-type Serial struct {
-	world World
+type serial struct {
+	world world
 }
 
-func InitSerial(world World, _ int) Implementation {
-	return &Serial{world}
+func initSerial(world world, _ int) implementation {
+	return &serial{world}
 }
 
-func (s *Serial) NextTurn() {
+func (s *serial) nextTurn() {
 	s.world.matrix = gameOfLifeTurn(func(i int) []byte {
 		return s.world.matrix[customMod(i, s.world.height)]
 	}, s.world.height, s.world.width)
 }
 
-func (s *Serial) GetWorld() World {
-	return s.world.Clone()
+func (s *serial) getWorld() world {
+	return s.world.clone()
 }
 
-func (p *Serial) Close() {}
+func (p *serial) close() {}

@@ -9,7 +9,7 @@ import (
 // The state should be locked before any read/writes to the implementation or current turn
 type distributorState struct {
 	currentTurn int
-	impl        Implementation
+	impl        implementation
 	locker      sync.Locker
 }
 
@@ -27,7 +27,7 @@ func distributor(p golParams, d distributorChans, alive chan []cell) {
 		lock = NopLocker{}
 	}
 
-	i := getInitFn(p.implementationName)(LoadWorldFromPgm(p.imageHeight, p.imageWidth, d), p.threads)
+	i := getInitFn(p.implementationName)(loadWorldFromPgm(p.imageHeight, p.imageWidth, d), p.threads)
 
 	state := distributorState{
 		currentTurn: 0,
@@ -43,7 +43,7 @@ func distributor(p golParams, d distributorChans, alive chan []cell) {
 	turnLocal := 0
 	for turnLocal < p.turns {
 		state.locker.Lock()
-		state.impl.NextTurn()
+		state.impl.nextTurn()
 		turnLocal++
 		state.currentTurn = turnLocal
 		state.locker.Unlock()
@@ -55,10 +55,10 @@ func distributor(p golParams, d distributorChans, alive chan []cell) {
 
 	// Return the coordinates of cells that are still alive.
 	state.locker.Lock()
-	w := state.impl.GetWorld()
-	alive <- w.CalculateAlive()
+	w := state.impl.getWorld()
+	alive <- w.calculateAlive()
 
-	state.impl.Close()
+	state.impl.close()
 }
 
 func handleKeyboard(state *distributorState, d distributorChans) {
@@ -67,10 +67,10 @@ func handleKeyboard(state *distributorState, d distributorChans) {
 		switch keyPress {
 		case 's':
 			state.locker.Lock()
-			w := state.impl.GetWorld()
+			w := state.impl.getWorld()
 			t := state.currentTurn
 			state.locker.Unlock()
-			w.SaveToPgm(d, t)
+			w.saveToPgm(d, t)
 		case 'p':
 			state.locker.Lock()
 			fmt.Printf("Paused. Press p to continue...\n")
@@ -86,8 +86,8 @@ func handleKeyboard(state *distributorState, d distributorChans) {
 			state.locker.Unlock()
 		case 'q':
 			state.locker.Lock()
-			w := state.impl.GetWorld()
-			w.SaveToPgm(d, state.currentTurn)
+			w := state.impl.getWorld()
+			w.saveToPgm(d, state.currentTurn)
 			// Make sure that the Io has finished any output before exiting (so that the save completes)
 			d.io.command <- ioCheckIdle
 			<-d.io.idle
@@ -101,16 +101,16 @@ func ticker(state *distributorState) {
 	for {
 		<-ticker.C
 		state.locker.Lock()
-		world := state.impl.GetWorld()
+		world := state.impl.getWorld()
 		turn := state.currentTurn
 		state.locker.Unlock()
-		fmt.Printf("On turn: %d there are %d alive\n", turn, len(world.CalculateAlive()))
+		fmt.Printf("On turn: %d there are %d alive\n", turn, len(world.calculateAlive()))
 	}
 }
 
-func getInitFn(name string) ImplementationInitFn {
+func getInitFn(name string) implementationInitFn {
 	if name == "" {
-		return ImplementationDefault.initFn()
+		return implementationDefault.initFn()
 	} else {
 		impl, err := implementationFromName(name)
 		check(err)

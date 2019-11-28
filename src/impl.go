@@ -5,71 +5,71 @@ import (
 	"strings"
 )
 
-type Implementation interface {
-	NextTurn()
-	GetWorld() World
-	Close()
+type implementation interface {
+	nextTurn()
+	getWorld() world
+	close()
 }
 
-type ImplementationEnum int
+type implementationEnum int
 
-type ImplementationInitFn func(world World, threads int) Implementation
+type implementationInitFn func(world world, threads int) implementation
 
 // An enum that represents the different GoL implementations
 const (
-	ImplementationSerial = iota
-	ImplementationParallel
-	ImplementationParallelShared
-	ImplementationHalo
-	ImplementationRust
+	implementationSerial = iota
+	implementationParallel
+	implementationParallelShared
+	implementationHalo
+	implementationRust
 )
 
-const ImplementationDefault ImplementationEnum = ImplementationRust
+const implementationDefault implementationEnum = implementationRust
 
 // This is case insensitive
-func implementationFromName(s string) (ImplementationEnum, error) {
+func implementationFromName(s string) (implementationEnum, error) {
 	s = strings.ToLower(s)
 	switch s {
 	case "serial":
-		return ImplementationSerial, nil
+		return implementationSerial, nil
 	case "parallel":
-		return ImplementationParallel, nil
+		return implementationParallel, nil
 	case "parallelshared":
-		return ImplementationParallelShared, nil
+		return implementationParallelShared, nil
 	case "halo":
-		return ImplementationHalo, nil
+		return implementationHalo, nil
 	case "rust":
-		return ImplementationRust, nil
+		return implementationRust, nil
 	default:
 		return 0, errors.New("invalid implementation name")
 	}
 }
 
-func (i ImplementationEnum) initFn() ImplementationInitFn {
+func (i implementationEnum) initFn() implementationInitFn {
 	switch i {
-	case ImplementationSerial:
-		return InitSerial
-	case ImplementationParallel:
-		return InitParallel
-	case ImplementationParallelShared:
-		return InitParallelShared
-	case ImplementationRust:
-		return InitRust
+	case implementationSerial:
+		return initSerial
+	case implementationParallel:
+		return initParallel
+	case implementationParallelShared:
+		return initParallelShared
+	case implementationRust:
+		return initRust
 	}
 	panic("unmatched case")
 }
 
-func (i ImplementationEnum) name() string {
+func (i implementationEnum) name() string {
 	switch i {
-	case ImplementationSerial:
+	case implementationSerial:
 		return "Serial"
-	case ImplementationParallel:
+	case implementationParallel:
 		return "Parallel"
-	case ImplementationParallelShared:
+	case implementationParallelShared:
 		return "ParallelShared"
-	case ImplementationHalo:
+	case implementationHalo:
 		return "Halo"
-	case ImplementationRust:
+	case implementationRust:
 		return "Rust"
 	}
 	panic("unmatched case")

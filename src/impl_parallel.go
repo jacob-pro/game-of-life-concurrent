@@ -1,12 +1,12 @@
 package main
 
 // Stage 1b parallel implementation
-type Parallel struct {
-	world   World
+type parallel struct {
+	world   world
 	workers []workerExternal
 }
 
-func InitParallel(world World, threads int) Implementation {
+func initParallel(world world, threads int) implementation {
 	s := rowsForEachThread(threads, world.height)
 	workers := make([]workerExternal, threads)
 	for i, rows := range s {
@@ -26,7 +26,7 @@ func InitParallel(world World, threads int) Implementation {
 		go parallelWorker(x)
 	}
 
-	return &Parallel{
+	return &parallel{
 		world:   world,
 		workers: workers,
 	}
@@ -75,7 +75,7 @@ func sendRowToChannel(row []byte, width int, dest chan<- byte) {
 	}
 }
 
-func (p *Parallel) NextTurn() {
+func (p *parallel) nextTurn() {
 
 	// Send work
 	offset := 0
@@ -103,8 +103,8 @@ func (p *Parallel) NextTurn() {
 	}
 }
 
-func (p *Parallel) GetWorld() World {
-	return p.world.Clone()
+func (p *parallel) getWorld() world {
+	return p.world.clone()
 }
 
-func (p *Parallel) Close() {}
+func (p *parallel) close() {}
