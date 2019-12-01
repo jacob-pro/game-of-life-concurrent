@@ -6,8 +6,9 @@ type halo struct {
 }
 
 type dist struct {
-	rows          int
+	rows         int
 	sendTick     chan<- bool // False causes return, True causes continue
+	getResult    <-chan byte
 }
 
 type worker struct {
@@ -37,8 +38,9 @@ func initHalo(world world, threads int) implementation {
 		worldChan := make(chan byte)
 		resultChan := make(chan byte)
 		workers[i] = dist{
-			rows:          rows,
+			rows:         rows,
 			sendTick:     tickChan,
+			getResult:    resultChan,
 		}
 		reverse := false
 		if i == 0 {
@@ -82,50 +84,59 @@ func haloWorker(w worker) {
 
 
 	for {
-		if w.reverse {
-			sendRowToChannel(worldFragment[w.rows - 1], w.width, w.workerBottom)
-			for i := 0; i < w.width; i++ {
-				rowAbove[i] = <- w.workerTop
-			}
+		proceed := <- w.receiveTick
+		if proceed { // Process Turn
+			if w.reverse {
+				sendRowToChannel(worldFragment[w.rows-1], w.width, w.workerBottom)
+				for i := 0; i < w.width; i++ {
+					rowAbove[i] = <-w.workerTop
+				}
 
-			sendRowToChannel(worldFragment[0], w.width, w.workerTop)
-			for i := 0; i < w.width; i++ {
-				rowBelow[i] = <- w.workerBottom
-			}
-		} else {
-			for i := 0; i < w.width; i++ {
-				rowAbove[i] = <- w.workerTop
-			}
-			sendRowToChannel(worldFragment[w.rows - 1], w.width, w.workerBottom)
+				sendRowToChannel(worldFragment[0], w.width, w.workerTop)
+				for i := 0; i < w.width; i++ {
+					rowBelow[i] = <-w.workerBottom
+				}
+			} else {
+				for i := 0; i < w.width; i++ {
+					rowAbove[i] = <-w.workerTop
+				}
+				sendRowToChannel(worldFragment[w.rows-1], w.width, w.workerBottom)
 
-			for i := 0; i < w.width; i++ {
-				rowBelow[i] = <- w.workerBottom
+				for i := 0; i < w.width; i++ {
+					rowBelow[i] = <-w.workerBottom
+				}
+				sendRowToChannel(worldFragment[0], w.width, w.workerTop)
 			}
-			sendRowToChannel(worldFragment[0], w.width, w.workerTop)
+		} else { // Return Data
+			for i := range worldFragment {
+				sendRowToChannel(worldFragment[i], w.width, w.sendResult)
+			}
 		}
 
 		/* Done to here */
 
 
 		// Compute GoL
-		result := gameOfLifeTurn(func(i int) []byte {
-			return worldFragment[i+1]
-		}, w.rows, w.width)
 
-		// Send result
-		for y := 0; y < w.rows; y++ {
-			for x := 0; x < w.width; x++ {
-				w.sendResult <- result[y][x]
-			}
-		}
 	}
 }
 
 func (h *halo) nextTurn() {
+	for i := range h.workers {
+		h.workers[i].sendTick <- true
+	}
 }
 
-func (h *halo) getWorld() world {
-	return h.startWorld
+func (h *halo) getWorld() world { // Gets rows from each worker in turn
+	offset := 0
+	for i := range h.workers {
+		for j := offset; j < offset + h.workers[i].rows; j++ {
+			for k := 0; k < h.startWorld.width; k++ {
+				h.startWorld.matrix[offset + j][k] = <-h.workers[i].getResult
+			}
+		}
+	}
+
 }
 
 func (h *halo) close() {}
