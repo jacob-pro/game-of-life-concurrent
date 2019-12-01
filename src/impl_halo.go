@@ -136,7 +136,7 @@ func (h *halo) getWorld() world { // Gets rows from each worker in turn
 			}
 		}
 	}
-
+	return h.startWorld
 }
 
 func (h *halo) close() {}

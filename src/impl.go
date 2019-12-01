@@ -24,7 +24,7 @@ const (
 	implementationRust
 )
 
-const implementationDefault implementationEnum = implementationRust
+const implementationDefault implementationEnum = implementationHalo
 
 // This is case insensitive
 func implementationFromName(s string) (implementationEnum, error) {
@@ -53,6 +53,8 @@ func (i implementationEnum) initFn() implementationInitFn {
 		return initParallel
 	case implementationParallelShared:
 		return initParallelShared
+	case implementationHalo:
+		return initHalo
 	case implementationRust:
 		return initRust
 	}
