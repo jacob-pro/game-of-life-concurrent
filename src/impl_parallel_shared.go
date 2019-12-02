@@ -4,12 +4,12 @@ import (
 	"sync"
 )
 
-// Stage 5 option 1, parallel using shared memory
 type parallelShared struct {
 	world             world
 	rowsForEachThread []int
 }
 
+// Stage 5 option 1, parallel using shared memory
 func initParallelShared(world world, threads int) implementation {
 	return &parallelShared{
 		world:             world,

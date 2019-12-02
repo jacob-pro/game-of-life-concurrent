@@ -6,13 +6,13 @@ package main
 // #include <gol.h>
 import "C"
 
-// Stage 5 some crazy shit
 type rust struct {
 	gol    *C.GameOfLife
 	height int
 	width  int
 }
 
+// Stage 5 custom high performance implementation
 func initRust(world world, threads int) implementation {
 	// Flatten the world
 	var k []byte

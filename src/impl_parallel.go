@@ -1,11 +1,11 @@
 package main
 
-// Stage 1b parallel implementation
 type parallel struct {
 	world   world
 	workers []workerExternal
 }
 
+// Stage 1b parallel implementation
 func initParallel(world world, threads int) implementation {
 	s := rowsForEachThread(threads, world.height)
 	workers := make([]workerExternal, threads)
