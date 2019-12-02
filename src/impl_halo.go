@@ -1,8 +1,9 @@
 package main
 
 type halo struct {
-	startWorld world
-	workers    []dist
+	height  int
+	width   int
+	workers []dist
 }
 
 type haloCommand uint8
@@ -13,15 +14,17 @@ const (
 )
 
 type dist struct {
-	rows        int
-	sendCommand chan<- haloCommand
-	getResult   <-chan byte
+	rows              int
+	sendCommand       chan<- haloCommand
+	receiveCompletion <-chan int
+	getResult         <-chan byte
 }
 
 type worker struct {
 	rows           int
 	width          int
 	receiveCommand <-chan haloCommand
+	sendCompletion chan<- int
 	receiveWorld   <-chan byte
 	sendResult     chan<- byte
 	reverse        bool
@@ -29,6 +32,7 @@ type worker struct {
 	workerBottom   chan byte
 }
 
+// Stage 4 halo exchange implementation
 func initHalo(world world, threads int) implementation {
 	s := rowsForEachThread(threads, world.height)
 	workers := make([]dist, threads)
@@ -41,13 +45,15 @@ func initHalo(world world, threads int) implementation {
 	offset := 0
 
 	for i, rows := range s {
-		tickChan := make(chan haloCommand)
+		commandChan := make(chan haloCommand)
+		completeChan := make(chan int)
 		worldChan := make(chan byte)
 		resultChan := make(chan byte)
 		workers[i] = dist{
-			rows:        rows,
-			sendCommand: tickChan,
-			getResult:   resultChan,
+			rows:              rows,
+			sendCommand:       commandChan,
+			receiveCompletion: completeChan,
+			getResult:         resultChan,
 		}
 		reverse := false
 		if i == 0 {
@@ -56,7 +62,8 @@ func initHalo(world world, threads int) implementation {
 		x := worker{
 			rows:           rows,
 			width:          world.width,
-			receiveCommand: tickChan,
+			receiveCommand: commandChan,
+			sendCompletion: completeChan,
 			sendResult:     resultChan,
 			reverse:        reverse,
 			receiveWorld:   worldChan,
@@ -70,8 +77,9 @@ func initHalo(world world, threads int) implementation {
 		offset += x.rows
 	}
 	return &halo{
-		startWorld: world,
-		workers:    workers,
+		height:  world.height,
+		width:   world.width,
+		workers: workers,
 	}
 }
 
@@ -125,7 +133,7 @@ func haloWorker(w worker) {
 				}
 			}, w.rows, w.width)
 
-			w.sendResult <- 0
+			w.sendCompletion <- 0
 		case haloGetWorld:
 			for i := range worldFragment {
 				sendRowToChannel(worldFragment[i], w.width, w.sendResult)
@@ -135,26 +143,27 @@ func haloWorker(w worker) {
 }
 
 func (h *halo) nextTurn() {
-	for i := range h.workers {
-		h.workers[i].sendCommand <- haloTick
+	for _, w := range h.workers {
+		w.sendCommand <- haloTick
 	}
-	for i := range h.workers {
-		<-h.workers[i].getResult
+	for _, w := range h.workers {
+		<-w.receiveCompletion
 	}
 }
 
-func (h *halo) getWorld() world { // Gets rows from each worker in turn
+func (h *halo) getWorld() world {
+	world := newWorld(h.height, h.width)
 	rowCounter := 0
 	for _, worker := range h.workers {
 		worker.sendCommand <- haloGetWorld
 		for i := 0; i < worker.rows; i++ {
-			for w := 0; w < h.startWorld.width; w++ {
-				h.startWorld.matrix[rowCounter][w] = <-worker.getResult
+			for w := 0; w < h.width; w++ {
+				world.matrix[rowCounter][w] = <-worker.getResult
 			}
 			rowCounter++
 		}
 	}
-	return h.startWorld.clone()
+	return world
 }
 
 func (h *halo) close() {}

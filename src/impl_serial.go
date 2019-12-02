@@ -1,10 +1,10 @@
 package main
 
-// Stage 1a single threaded implementation
 type serial struct {
 	world world
 }
 
+// Stage 1a single threaded implementation
 func initSerial(world world, _ int) implementation {
 	return &serial{world}
 }
