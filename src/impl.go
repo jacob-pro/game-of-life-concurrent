@@ -17,14 +17,14 @@ type implementationInitFn func(world world, threads int) implementation
 
 // An enum that represents the different GoL implementations
 const (
-	implementationSerial = iota
+	implementationSerial implementationEnum = iota
 	implementationParallel
 	implementationParallelShared
 	implementationHalo
 	implementationRust
 )
 
-const implementationDefault implementationEnum = implementationHalo
+const implementationDefault = implementationHalo
 
 // This is case insensitive
 func implementationFromName(s string) (implementationEnum, error) {

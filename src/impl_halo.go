@@ -2,24 +2,31 @@ package main
 
 type halo struct {
 	startWorld world
-	workers []dist
+	workers    []dist
 }
 
+type haloCommand uint8
+
+const (
+	haloTick haloCommand = iota
+	haloGetWorld
+)
+
 type dist struct {
-	rows         int
-	sendTick     chan<- bool // False causes return, True causes continue
-	getResult    <-chan byte
+	rows        int
+	sendCommand chan<- haloCommand
+	getResult   <-chan byte
 }
 
 type worker struct {
-	rows         int
-	width        int
-	receiveTick  <-chan bool
-	receiveWorld <-chan byte
-	sendResult   chan<- byte
-	reverse      bool
-	workerTop    chan byte
-	workerBottom chan byte
+	rows           int
+	width          int
+	receiveCommand <-chan haloCommand
+	receiveWorld   <-chan byte
+	sendResult     chan<- byte
+	reverse        bool
+	workerTop      chan byte
+	workerBottom   chan byte
 }
 
 func initHalo(world world, threads int) implementation {
@@ -34,27 +41,27 @@ func initHalo(world world, threads int) implementation {
 	offset := 0
 
 	for i, rows := range s {
-		tickChan := make(chan bool)
+		tickChan := make(chan haloCommand)
 		worldChan := make(chan byte)
 		resultChan := make(chan byte)
 		workers[i] = dist{
-			rows:         rows,
-			sendTick:     tickChan,
-			getResult:    resultChan,
+			rows:        rows,
+			sendCommand: tickChan,
+			getResult:   resultChan,
 		}
 		reverse := false
 		if i == 0 {
 			reverse = true
 		}
 		x := worker{
-			rows:         rows,
-			width:        world.width,
-			receiveTick:  tickChan,
-			sendResult:   resultChan,
-			reverse:      reverse,
-			receiveWorld: worldChan,
-			workerTop:    workerChans[customMod(i - 1, threads)], // Assign comm chan to previous thread. May not work.
-			workerBottom: workerChans[customMod(i, threads)],
+			rows:           rows,
+			width:          world.width,
+			receiveCommand: tickChan,
+			sendResult:     resultChan,
+			reverse:        reverse,
+			receiveWorld:   worldChan,
+			workerTop:      workerChans[customMod(i-1, threads)], // Assign comm chan to previous thread. May not work.
+			workerBottom:   workerChans[customMod(i, threads)],
 		}
 		go haloWorker(x)
 		for i := 0; i < x.rows; i++ {
@@ -62,9 +69,9 @@ func initHalo(world world, threads int) implementation {
 		}
 		offset += x.rows
 	}
-	return &halo {
+	return &halo{
 		startWorld: world,
-		workers: workers,
+		workers:    workers,
 	}
 }
 
@@ -82,10 +89,10 @@ func haloWorker(w worker) {
 	rowAbove := make([]byte, w.width)
 	rowBelow := make([]byte, w.width)
 
-
 	for {
-		proceed := <- w.receiveTick
-		if proceed { // Process Turn
+		proceed := <-w.receiveCommand
+		switch proceed {
+		case haloTick:
 			if w.reverse {
 				sendRowToChannel(worldFragment[w.rows-1], w.width, w.workerBottom)
 				for i := 0; i < w.width; i++ {
@@ -107,36 +114,47 @@ func haloWorker(w worker) {
 				}
 				sendRowToChannel(worldFragment[0], w.width, w.workerTop)
 			}
-		} else { // Return Data
+
+			worldFragment = gameOfLifeTurn(func(i int) []byte {
+				if i == -1 {
+					return rowAbove
+				} else if i == w.rows {
+					return rowBelow
+				} else {
+					return worldFragment[i]
+				}
+			}, w.rows, w.width)
+
+			w.sendResult <- 0
+		case haloGetWorld:
 			for i := range worldFragment {
 				sendRowToChannel(worldFragment[i], w.width, w.sendResult)
 			}
 		}
-
-		/* Done to here */
-
-
-		// Compute GoL
-
 	}
 }
 
 func (h *halo) nextTurn() {
 	for i := range h.workers {
-		h.workers[i].sendTick <- true
+		h.workers[i].sendCommand <- haloTick
+	}
+	for i := range h.workers {
+		<-h.workers[i].getResult
 	}
 }
 
 func (h *halo) getWorld() world { // Gets rows from each worker in turn
-	offset := 0
-	for i := range h.workers {
-		for j := offset; j < offset + h.workers[i].rows; j++ {
-			for k := 0; k < h.startWorld.width; k++ {
-				h.startWorld.matrix[offset + j][k] = <-h.workers[i].getResult
+	rowCounter := 0
+	for _, worker := range h.workers {
+		worker.sendCommand <- haloGetWorld
+		for i := 0; i < worker.rows; i++ {
+			for w := 0; w < h.startWorld.width; w++ {
+				h.startWorld.matrix[rowCounter][w] = <-worker.getResult
 			}
+			rowCounter++
 		}
 	}
-	return h.startWorld
+	return h.startWorld.clone()
 }
 
 func (h *halo) close() {}
