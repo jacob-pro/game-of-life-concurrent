@@ -24,7 +24,7 @@ const (
 	implementationRust
 )
 
-const implementationDefault = implementationHalo
+const implementationDefault = implementationRust
 
 // This is case insensitive
 func implementationFromName(s string) (implementationEnum, error) {
