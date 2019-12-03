@@ -1,318 +1,112 @@
 package main
 
 import (
+	"flag"
 	"fmt"
 	"os"
 	"testing"
 )
 
+var impl string
+
+func init() {
+	flag.StringVar(&impl, "i", implementationDefault.name(), "Specify the implementation to use")
+}
+
 func Test(t *testing.T) {
+	seeds := []struct {
+		p             golParams
+		expectedAlive []cell
+	}{
+		{
+			p: golParams{
+				turns:       0,
+				imageWidth:  16,
+				imageHeight: 16,
+			},
+			expectedAlive: []cell{
+				{x: 4, y: 5},
+				{x: 5, y: 6},
+				{x: 3, y: 7},
+				{x: 4, y: 7},
+				{x: 5, y: 7},
+			},
+		},
+		{
+			p: golParams{
+				turns:       1,
+				imageWidth:  16,
+				imageHeight: 16,
+			},
+			expectedAlive: []cell{
+				{x: 3, y: 6},
+				{x: 5, y: 6},
+				{x: 4, y: 7},
+				{x: 5, y: 7},
+				{x: 4, y: 8},
+			},
+		},
+		{
+			p: golParams{
+				turns:       100,
+				imageWidth:  16,
+				imageHeight: 16,
+			},
+			expectedAlive: []cell{
+				{x: 12, y: 0},
+				{x: 13, y: 0},
+				{x: 14, y: 0},
+				{x: 13, y: 14},
+				{x: 14, y: 15},
+			},
+		},
+	}
+
 	type args struct {
 		p             golParams
 		expectedAlive []cell
 	}
-	tests := []struct {
+	type test struct {
 		name string
 		args args
-	}{
-		{"16x16x2-0", args{
-			p: golParams{
-				turns:       0,
-				threads:     2,
-				imageWidth:  16,
-				imageHeight: 16,
-			},
-			expectedAlive: []cell{
-				{x: 4, y: 5},
-				{x: 5, y: 6},
-				{x: 3, y: 7},
-				{x: 4, y: 7},
-				{x: 5, y: 7},
-			},
-		}},
-
-		{"16x16x4-0", args{
-			p: golParams{
-				turns:       0,
-				threads:     4,
-				imageWidth:  16,
-				imageHeight: 16,
-			},
-			expectedAlive: []cell{
-				{x: 4, y: 5},
-				{x: 5, y: 6},
-				{x: 3, y: 7},
-				{x: 4, y: 7},
-				{x: 5, y: 7},
-			},
-		}},
-
-		{"16x16x6-0", args{
-			p: golParams{
-				turns:       0,
-				threads:     6,
-				imageWidth:  16,
-				imageHeight: 16,
-			},
-			expectedAlive: []cell{
-				{x: 4, y: 5},
-				{x: 5, y: 6},
-				{x: 3, y: 7},
-				{x: 4, y: 7},
-				{x: 5, y: 7},
-			},
-		}},
-
-		{"16x16x8-0", args{
-			p: golParams{
-				turns:       0,
-				threads:     8,
-				imageWidth:  16,
-				imageHeight: 16,
-			},
-			expectedAlive: []cell{
-				{x: 4, y: 5},
-				{x: 5, y: 6},
-				{x: 3, y: 7},
-				{x: 4, y: 7},
-				{x: 5, y: 7},
-			},
-		}},
-
-		{"16x16x10-0", args{
-			p: golParams{
-				turns:       0,
-				threads:     10,
-				imageWidth:  16,
-				imageHeight: 16,
-			},
-			expectedAlive: []cell{
-				{x: 4, y: 5},
-				{x: 5, y: 6},
-				{x: 3, y: 7},
-				{x: 4, y: 7},
-				{x: 5, y: 7},
-			},
-		}},
-
-		{"16x16x12-0", args{
-			p: golParams{
-				turns:       0,
-				threads:     12,
-				imageWidth:  16,
-				imageHeight: 16,
-			},
-			expectedAlive: []cell{
-				{x: 4, y: 5},
-				{x: 5, y: 6},
-				{x: 3, y: 7},
-				{x: 4, y: 7},
-				{x: 5, y: 7},
-			},
-		}},
-
-		{"16x16x2-1", args{
-			p: golParams{
-				turns:       1,
-				threads:     2,
-				imageWidth:  16,
-				imageHeight: 16,
-			},
-			expectedAlive: []cell{
-				{x: 3, y: 6},
-				{x: 5, y: 6},
-				{x: 4, y: 7},
-				{x: 5, y: 7},
-				{x: 4, y: 8},
-			},
-		}},
-
-		{"16x16x4-1", args{
-			p: golParams{
-				turns:       1,
-				threads:     4,
-				imageWidth:  16,
-				imageHeight: 16,
-			},
-			expectedAlive: []cell{
-				{x: 3, y: 6},
-				{x: 5, y: 6},
-				{x: 4, y: 7},
-				{x: 5, y: 7},
-				{x: 4, y: 8},
-			},
-		}},
-
-		{"16x16x6-1", args{
-			p: golParams{
-				turns:       1,
-				threads:     6,
-				imageWidth:  16,
-				imageHeight: 16,
-			},
-			expectedAlive: []cell{
-				{x: 3, y: 6},
-				{x: 5, y: 6},
-				{x: 4, y: 7},
-				{x: 5, y: 7},
-				{x: 4, y: 8},
-			},
-		}},
-
-		{"16x16x8-1", args{
-			p: golParams{
-				turns:       1,
-				threads:     8,
-				imageWidth:  16,
-				imageHeight: 16,
-			},
-			expectedAlive: []cell{
-				{x: 3, y: 6},
-				{x: 5, y: 6},
-				{x: 4, y: 7},
-				{x: 5, y: 7},
-				{x: 4, y: 8},
-			},
-		}},
-
-		{"16x16x10-1", args{
-			p: golParams{
-				turns:       1,
-				threads:     10,
-				imageWidth:  16,
-				imageHeight: 16,
-			},
-			expectedAlive: []cell{
-				{x: 3, y: 6},
-				{x: 5, y: 6},
-				{x: 4, y: 7},
-				{x: 5, y: 7},
-				{x: 4, y: 8},
-			},
-		}},
-
-		{"16x16x12-1", args{
-			p: golParams{
-				turns:       1,
-				threads:     12,
-				imageWidth:  16,
-				imageHeight: 16,
-			},
-			expectedAlive: []cell{
-				{x: 3, y: 6},
-				{x: 5, y: 6},
-				{x: 4, y: 7},
-				{x: 5, y: 7},
-				{x: 4, y: 8},
-			},
-		}},
-
-		{"16x16x2-100", args{
-			p: golParams{
-				turns:       100,
-				threads:     2,
-				imageWidth:  16,
-				imageHeight: 16,
-			},
-			expectedAlive: []cell{
-				{x: 12, y: 0},
-				{x: 13, y: 0},
-				{x: 14, y: 0},
-				{x: 13, y: 14},
-				{x: 14, y: 15},
-			},
-		}},
-
-		{"16x16x4-100", args{
-			p: golParams{
-				turns:       100,
-				threads:     4,
-				imageWidth:  16,
-				imageHeight: 16,
-			},
-			expectedAlive: []cell{
-				{x: 12, y: 0},
-				{x: 13, y: 0},
-				{x: 14, y: 0},
-				{x: 13, y: 14},
-				{x: 14, y: 15},
-			},
-		}},
-
-		{"16x16x6-100", args{
-			p: golParams{
-				turns:       100,
-				threads:     6,
-				imageWidth:  16,
-				imageHeight: 16,
-			},
-			expectedAlive: []cell{
-				{x: 12, y: 0},
-				{x: 13, y: 0},
-				{x: 14, y: 0},
-				{x: 13, y: 14},
-				{x: 14, y: 15},
-			},
-		}},
-
-		{"16x16x8-100", args{
-			p: golParams{
-				turns:       100,
-				threads:     8,
-				imageWidth:  16,
-				imageHeight: 16,
-			},
-			expectedAlive: []cell{
-				{x: 12, y: 0},
-				{x: 13, y: 0},
-				{x: 14, y: 0},
-				{x: 13, y: 14},
-				{x: 14, y: 15},
-			},
-		}},
-
-		{"16x16x10-100", args{
-			p: golParams{
-				turns:       100,
-				threads:     10,
-				imageWidth:  16,
-				imageHeight: 16,
-			},
-			expectedAlive: []cell{
-				{x: 12, y: 0},
-				{x: 13, y: 0},
-				{x: 14, y: 0},
-				{x: 13, y: 14},
-				{x: 14, y: 15},
-			},
-		}},
-
-		{"16x16x12-100", args{
-			p: golParams{
-				turns:       100,
-				threads:     12,
-				imageWidth:  16,
-				imageHeight: 16,
-			},
-			expectedAlive: []cell{
-				{x: 12, y: 0},
-				{x: 13, y: 0},
-				{x: 14, y: 0},
-				{x: 13, y: 14},
-				{x: 14, y: 15},
-			},
-		}},
-
-		// Special test to be used to generate traces - not a real test
-		//{"trace", args{
-		//	p: golParams{
-		//		turns:       10,
-		//		threads:     4,
-		//		imageWidth:  64,
-		//		imageHeight: 64,
-		//	},
-		//}},
 	}
+
+	tests := make([]test, 0)
+	threads := [7]int{2, 4, 6, 8, 10, 12, 16}
+	fmt.Printf("Implementation: %s\n", impl)
+
+	for _, seed := range seeds {
+		for _, thread := range threads {
+			params := seed.p
+			params.implementationName = impl
+			params.threads = thread
+
+			args := args{
+				p:             params,
+				expectedAlive: seed.expectedAlive,
+			}
+			name := fmt.Sprintf("%dx%dx%d-%d", params.imageHeight, params.imageWidth, params.turns, params.threads)
+
+			tests = append(tests, test{
+				name: name,
+				args: args,
+			})
+		}
+	}
+
+	// Special test to be used to generate traces - not a real test
+	tests = append(tests, test{
+		name: "trace",
+		args: args{
+			p: golParams{
+				turns:       10,
+				threads:     4,
+				imageWidth:  64,
+				imageHeight: 64,
+			},
+		},
+	})
+
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			alive := gameOfLife(test.args.p, nil)
@@ -451,10 +245,12 @@ func Benchmark(b *testing.B) {
 				imageHeight: 512,
 			}},
 	}
+	fmt.Printf("Implementation: %s\n", impl)
 	for _, bm := range benchmarks {
 		os.Stdout = nil // Disable all program output apart from benchmark results
 		b.Run(bm.name, func(b *testing.B) {
 			for i := 0; i < b.N; i++ {
+				bm.p.implementationName = impl
 				gameOfLife(bm.p, nil)
 				//fmt.Println("Ran bench:", bm.name)
 			}
@@ -463,7 +259,7 @@ func Benchmark(b *testing.B) {
 }
 
 func boardFail(t *testing.T, given, expected []cell, p golParams) bool {
-	errorString := fmt.Sprintf("-----------------\n\n  FAILED TEST\n  16x16\n  %d Workers\n  %d Turns\n", p.threads, p.turns)
+	errorString := fmt.Sprintf("-----------------\n\n  FAILED TEST\n  16x16\n  %d Workers\n  %d Turns\n  %s\n", p.threads, p.turns, p.implementationName)
 	errorString = errorString + aliveCellsToString(given, expected, p.imageWidth, p.imageHeight)
 	t.Error(errorString)
 	return false

@@ -16,3 +16,7 @@ To use cgo on Windows requires gcc.
 To run make on windows
 - In an MSYS2 terminal `pacman --sync make`
 - Then use `C:\msys32\usr\bin\make.exe`
+
+Running tests:
+- `go test -args -i "halo"`
+- `go test -bench . -args -i "halo"`
