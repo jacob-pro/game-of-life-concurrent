@@ -95,14 +95,17 @@ func Test(t *testing.T) {
 	}
 
 	// Special test to be used to generate traces - not a real test
-	//{"trace", args{
-	//	p: golParams{
-	//		turns:       10,
-	//		threads:     4,
-	//		imageWidth:  64,
-	//		imageHeight: 64,
-	//	},
-	//}},
+	tests = append(tests, test{
+		name: "trace",
+		args: args{
+			p: golParams{
+				turns:       10,
+				threads:     4,
+				imageWidth:  64,
+				imageHeight: 64,
+			},
+		},
+	})
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
