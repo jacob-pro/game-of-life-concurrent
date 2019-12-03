@@ -1,10 +1,17 @@
 package main
 
 import (
+	"flag"
 	"fmt"
 	"os"
 	"testing"
 )
+
+var impl string
+
+func init() {
+	flag.StringVar(&impl, "i", implementationDefault.name(), "Specify the implementation to use")
+}
 
 func Test(t *testing.T) {
 	seeds := []struct {
@@ -66,28 +73,24 @@ func Test(t *testing.T) {
 
 	tests := make([]test, 0)
 	threads := [7]int{2, 4, 6, 8, 10, 12, 16}
-	impl := [5]string{"serial", "parallel", "halo", "parallelshared", "rust"}
+	fmt.Printf("Implementation: %s\n", impl)
 
 	for _, seed := range seeds {
 		for _, thread := range threads {
-			for _, i := range impl {
+			params := seed.p
+			params.implementationName = impl
+			params.threads = thread
 
-				params := seed.p
-				params.implementationName = i
-				params.threads = thread
-
-				args := args{
-					p:             params,
-					expectedAlive: seed.expectedAlive,
-				}
-				name := fmt.Sprintf("%dx%dx%d-%d-%s", params.imageHeight, params.imageWidth, params.turns, params.threads, params.implementationName)
-
-				tests = append(tests, test{
-					name: name,
-					args: args,
-				})
-
+			args := args{
+				p:             params,
+				expectedAlive: seed.expectedAlive,
 			}
+			name := fmt.Sprintf("%dx%dx%d-%d", params.imageHeight, params.imageWidth, params.turns, params.threads)
+
+			tests = append(tests, test{
+				name: name,
+				args: args,
+			})
 		}
 	}
 
@@ -239,10 +242,12 @@ func Benchmark(b *testing.B) {
 				imageHeight: 512,
 			}},
 	}
+	fmt.Printf("Implementation: %s\n", impl)
 	for _, bm := range benchmarks {
 		os.Stdout = nil // Disable all program output apart from benchmark results
 		b.Run(bm.name, func(b *testing.B) {
 			for i := 0; i < b.N; i++ {
+				bm.p.implementationName = impl
 				gameOfLife(bm.p, nil)
 				//fmt.Println("Ran bench:", bm.name)
 			}
