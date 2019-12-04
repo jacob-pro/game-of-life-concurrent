@@ -4,7 +4,7 @@ go test -c -o gameoflife.test
 rm -r benchmarks
 mkdir benchmarks
 
-benchtime=5x
+benchtime=10x
 benchmark=512x512x8
 
 for impl in serial parallel halo parallelshared rust
