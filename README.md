@@ -4,18 +4,13 @@ To run in Goland/Jetbrains add a `go build` build configuration in the `src` dir
 Make sure to enable `run.processes.with.pty` in the registry so that termbox will work
 
 - Install Rust https://www.rust-lang.org/tools/install
-- cbindgen is required to auto generate C Headers: `cargo install cbindgen`
-- Use the makefile in the root dir `make`
 
-To use cgo on Windows requires gcc. 
+To use cgo on Windows requires the Rust library be compiled with the GCC/GNU toolchain. 
 - `rustup toolchain install stable-gnu`
-- Install `msys2`
-- In an MSYS2 terminal `pacman --sync mingw-w64-x86_64-gcc`
-- Add `C:\msys64\mingw64\bin` to system PATH.
+- In an MINGW64 terminal `pacman -S mingw-w64-x86_64-gcc`
+- Install GNU make `pacman -S make`
 
-To run make on windows
-- In an MSYS2 terminal `pacman --sync make`
-- Then use `C:\msys32\usr\bin\make.exe`
+Build: `cd src && make`
 
 Running tests:
 - `go test -args -i "halo"`
