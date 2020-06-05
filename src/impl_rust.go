@@ -14,13 +14,8 @@ type rust struct {
 
 // Stage 5 custom high performance implementation
 func initRust(world world, threads int) implementation {
-	// Flatten the world
-	var k []byte
-	for _, v := range world.matrix {
-		k = append(k, v...)
-	}
-	//noinspection ALL
-	gol := C.gol_init((*C.uchar)(&k[0]), C.int32_t(world.height), C.int32_t(world.width), C.int32_t(threads))
+
+	gol := C.gol_init((*C.uchar)(&world.matrix[0]), C.int32_t(world.height), C.int32_t(world.width), C.int32_t(threads))
 
 	return &rust{
 		gol:    gol,
@@ -38,18 +33,10 @@ func (r *rust) getWorld() world {
 	b := make([]byte, r.width*r.height)
 	C.gol_get_world(r.gol, (*C.uchar)(&b[0]))
 
-	// Unflatten
-	unflat := make([][]byte, r.height)
-	for i := 0; i < r.height; i++ {
-		start := i * r.width
-		end := start + r.width
-		unflat[i] = b[start:end]
-	}
-
 	return world{
 		width:  r.width,
 		height: r.height,
-		matrix: unflat,
+		matrix: b,
 	}
 }
 

@@ -1,5 +1,11 @@
 package main
 
+func sendRowToChannel(world []byte, row int, width int, dest chan<- byte) {
+	for i := 0; i < width; i++ {
+		dest <- world[(row*width)+i]
+	}
+}
+
 // Calculate how many rows each thread will be responsible for
 func rowsForEachThread(threads int, rows int) []int {
 	s := make([]int, threads)
@@ -19,35 +25,38 @@ func customMod(index int, max int) int {
 	}
 }
 
-// The getRow closure should return values for (-1) to (height + 1)
-// Each row should have length equal to width
-func gameOfLifeTurn(getRow func(int) []byte, height int, width int) [][]byte {
-	result := make([][]byte, height)
-	for y := 0; y < height; y++ {
-		result[y] = make([]byte, width)
+// Rows is the number of rows to process
+// Width is how wide each row is
+// The offset is where the starting row is in the matrix
+// The result will have size rows * width
+func gameOfLifeTurn(matrix []byte, rows int, width int, offset int) []byte {
+	mHeight := len(matrix) / width
+	result := make([]byte, rows*width)
+	for y := 0; y < rows; y++ {
+		realY := y + offset
 		for x := 0; x < width; x++ {
 
-			//Clone current world into cell result
-			result[y][x] = getRow(y)[x]
+			result[(y*width)+x] = matrix[(realY*width)+x]
 
 			var neighboursAlive = 0
 			//Count alive cells in 3x3 grid
 			for i := y - 1; i <= y+1; i++ {
+				realI := i + offset
 				for j := x - 1; j <= x+1; j++ {
-					if getRow(i)[customMod(j, width)] == ALIVE {
+					if matrix[(customMod(realI, mHeight)*width)+customMod(j, width)] == ALIVE {
 						neighboursAlive++
 					}
 				}
 			}
-			if getRow(y)[x] == ALIVE {
+			if result[(y*width)+x] == ALIVE {
 				neighboursAlive--
 				if neighboursAlive == 2 || neighboursAlive == 3 {
-					result[y][x] = ALIVE
+					result[(y*width)+x] = ALIVE
 				} else {
-					result[y][x] = DEAD
+					result[(y*width)+x] = DEAD
 				}
 			} else if neighboursAlive == 3 {
-				result[y][x] = ALIVE
+				result[(y*width)+x] = ALIVE
 			}
 		}
 	}

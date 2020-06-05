@@ -20,15 +20,13 @@ func initParallelShared(world world, threads int) implementation {
 type parallelCell struct {
 	offset int
 	rows   int
-	result [][]byte
+	result []byte
 }
 
 // GoL for one cell
 func (p *parallelCell) compute(wg *sync.WaitGroup, world *world) {
 	defer wg.Done()
-	p.result = gameOfLifeTurn(func(i int) []byte {
-		return world.matrix[customMod(i+p.offset, world.height)]
-	}, p.rows, world.width)
+	p.result = gameOfLifeTurn(world.matrix, p.rows, world.width, p.offset)
 }
 
 func (p *parallelShared) nextTurn() {
@@ -54,7 +52,7 @@ func (p *parallelShared) nextTurn() {
 	wg.Wait()
 
 	// Reconstruct the world at end of turn
-	var result [][]byte
+	var result []byte
 	for _, cell := range cells {
 		result = append(result, cell.result...)
 	}

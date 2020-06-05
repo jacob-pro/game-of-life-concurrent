@@ -12,15 +12,12 @@ const DEAD byte = 0x00
 type world struct {
 	width  int
 	height int
-	matrix [][]byte
+	matrix []byte
 }
 
 // Create a new empty world
 func newWorld(height int, width int) world {
-	matrix := make([][]byte, height)
-	for i := range matrix {
-		matrix[i] = make([]byte, width)
-	}
+	matrix := make([]byte, height*width)
 	world := world{
 		width:  width,
 		height: height,
@@ -29,10 +26,18 @@ func newWorld(height int, width int) world {
 	return world
 }
 
-func (w *world) iterate(closure func(y int, x int, value byte)) {
-	for y := 0; y < w.height; y++ {
-		for x := 0; x < w.width; x++ {
-			closure(y, x, w.matrix[y][x])
+func (w *world) getCell(row int, col int) byte {
+	return w.matrix[(row*w.width)+col]
+}
+
+func (w *world) setCell(row int, col int, val byte) {
+	w.matrix[(row*w.width)+col] = val
+}
+
+func (w *world) iterate(closure func(row int, col int, value byte)) {
+	for row := 0; row < w.height; row++ {
+		for col := 0; col < w.width; col++ {
+			closure(row, col, w.getCell(row, col))
 		}
 	}
 }
@@ -40,9 +45,7 @@ func (w *world) iterate(closure func(y int, x int, value byte)) {
 // Create a clone of a world (separate memory)
 func (w *world) clone() world {
 	newW := newWorld(w.height, w.width)
-	w.iterate(func(y int, x int, value byte) {
-		newW.matrix[y][x] = value
-	})
+	copy(newW.matrix, w.matrix)
 	return newW
 }
 
@@ -59,7 +62,7 @@ func loadWorldFromPgm(height int, width int, d distributorChans) world {
 		val := <-d.io.inputVal
 		if val != 0 {
 			//fmt.Println("Alive cell at", x, y)
-			w.matrix[y][x] = val
+			w.setCell(y, x, val)
 		}
 	})
 

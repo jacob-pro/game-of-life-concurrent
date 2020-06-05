@@ -48,30 +48,17 @@ type workerInternal struct {
 func parallelWorker(w workerInternal) {
 	for {
 		// Receive the world fragment
-		worldFragment := make([][]byte, w.rows+2)
+		worldFragment := make([]byte, (w.rows+2)*w.width)
 		for i, _ := range worldFragment {
-			worldFragment[i] = make([]byte, w.width)
-			for x := 0; x < w.width; x++ {
-				worldFragment[i][x] = <-w.receiveInput
-			}
+			worldFragment[i] = <-w.receiveInput
 		}
 		// Compute GoL
-		result := gameOfLifeTurn(func(i int) []byte {
-			return worldFragment[i+1]
-		}, w.rows, w.width)
+		result := gameOfLifeTurn(worldFragment, w.rows, w.width, 1)
 
 		// Send result
-		for y := 0; y < w.rows; y++ {
-			for x := 0; x < w.width; x++ {
-				w.sendResult <- result[y][x]
-			}
+		for i, _ := range result {
+			w.sendResult <- result[i]
 		}
-	}
-}
-
-func sendRowToChannel(row []byte, width int, dest chan<- byte) {
-	for i := 0; i < width; i++ {
-		dest <- row[i]
 	}
 }
 
@@ -81,25 +68,24 @@ func (p *parallel) nextTurn() {
 	offset := 0
 	for _, worker := range p.workers {
 		// Send row above
-		sendRowToChannel(p.world.matrix[customMod(offset-1, p.world.height)], p.world.width, worker.sendInput)
+		sendRowToChannel(p.world.matrix, customMod(offset-1, p.world.height), p.world.width, worker.sendInput)
 		// Send rows to compute
 		for i := 0; i < worker.rows; i++ {
-			sendRowToChannel(p.world.matrix[offset+i], p.world.width, worker.sendInput)
+			sendRowToChannel(p.world.matrix, offset+i, p.world.width, worker.sendInput)
 		}
 		offset = offset + worker.rows
 		// Send row below
-		sendRowToChannel(p.world.matrix[customMod(offset, p.world.height)], p.world.width, worker.sendInput)
+		sendRowToChannel(p.world.matrix, customMod(offset, p.world.height), p.world.width, worker.sendInput)
 	}
 
 	// Collect results from workers
-	rowCounter := 0
+	recv := 0
 	for _, worker := range p.workers {
-		for i := 0; i < worker.rows; i++ {
-			for w := 0; w < p.world.width; w++ {
-				p.world.matrix[rowCounter][w] = <-worker.receiveResult
-			}
-			rowCounter++
+		size := worker.rows * p.world.width
+		for i := 0; i < worker.rows*p.world.width; i++ {
+			p.world.matrix[i+recv] = <-worker.receiveResult
 		}
+		recv += size
 	}
 }
 

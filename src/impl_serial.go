@@ -10,9 +10,7 @@ func initSerial(world world, _ int) implementation {
 }
 
 func (s *serial) nextTurn() {
-	s.world.matrix = gameOfLifeTurn(func(i int) []byte {
-		return s.world.matrix[customMod(i, s.world.height)]
-	}, s.world.height, s.world.width)
+	s.world.matrix = gameOfLifeTurn(s.world.matrix, s.world.height, s.world.width, 0)
 }
 
 func (s *serial) getWorld() world {

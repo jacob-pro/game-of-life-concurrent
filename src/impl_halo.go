@@ -72,7 +72,7 @@ func initHalo(world world, threads int) implementation {
 		}
 		go haloWorker(x)
 		for i := 0; i < x.rows; i++ {
-			sendRowToChannel(world.matrix[offset+i], world.width, worldChan)
+			sendRowToChannel(world.matrix, offset+i, world.width, worldChan)
 		}
 		offset += x.rows
 	}
@@ -85,58 +85,52 @@ func initHalo(world world, threads int) implementation {
 
 func haloWorker(w worker) {
 
-	// Loads in world
-	worldFragment := make([][]byte, w.rows)
-	for i, _ := range worldFragment {
-		worldFragment[i] = make([]byte, w.width)
-		for x := 0; x < w.width; x++ {
-			worldFragment[i][x] = <-w.receiveWorld
-		}
+	// Loads in world, fragment is 2 rows taller to have space for the rowAbove and rowBelow
+	worldFragment := make([]byte, (w.rows+2)*w.width)
+	for i := 0; i < (w.rows * w.width); i++ {
+		worldFragment[i+w.width] = <-w.receiveWorld
 	}
 
-	rowAbove := make([]byte, w.width)
-	rowBelow := make([]byte, w.width)
+	firstRow := 1
+	lastRow := w.rows
+	rowAboveStart := 0
+	rowAboveEnd := w.width
+	rowBelowStart := (w.rows + 1) * w.width
+	rowBelowEnd := (w.rows + 2) * w.width
 
 	for {
 		proceed := <-w.receiveCommand
 		switch proceed {
 		case haloTick:
 			if w.reverse {
-				sendRowToChannel(worldFragment[w.rows-1], w.width, w.workerBottom)
-				for i := 0; i < w.width; i++ {
-					rowAbove[i] = <-w.workerTop
+				sendRowToChannel(worldFragment, lastRow, w.width, w.workerBottom)
+				for i := rowAboveStart; i < rowAboveEnd; i++ {
+					worldFragment[i] = <-w.workerTop
 				}
 
-				sendRowToChannel(worldFragment[0], w.width, w.workerTop)
-				for i := 0; i < w.width; i++ {
-					rowBelow[i] = <-w.workerBottom
+				sendRowToChannel(worldFragment, firstRow, w.width, w.workerTop)
+				for i := rowBelowStart; i < rowBelowEnd; i++ {
+					worldFragment[i] = <-w.workerBottom
 				}
 			} else {
-				for i := 0; i < w.width; i++ {
-					rowAbove[i] = <-w.workerTop
+				for i := rowAboveStart; i < rowAboveEnd; i++ {
+					worldFragment[i] = <-w.workerTop
 				}
-				sendRowToChannel(worldFragment[w.rows-1], w.width, w.workerBottom)
+				sendRowToChannel(worldFragment, lastRow, w.width, w.workerBottom)
 
-				for i := 0; i < w.width; i++ {
-					rowBelow[i] = <-w.workerBottom
+				for i := rowBelowStart; i < rowBelowEnd; i++ {
+					worldFragment[i] = <-w.workerBottom
 				}
-				sendRowToChannel(worldFragment[0], w.width, w.workerTop)
+				sendRowToChannel(worldFragment, firstRow, w.width, w.workerTop)
 			}
 
-			worldFragment = gameOfLifeTurn(func(i int) []byte {
-				if i == -1 {
-					return rowAbove
-				} else if i == w.rows {
-					return rowBelow
-				} else {
-					return worldFragment[i]
-				}
-			}, w.rows, w.width)
+			result := gameOfLifeTurn(worldFragment, w.rows, w.width, 1)
+			copy(worldFragment[rowAboveEnd:rowBelowStart], result)
 
 			w.sendCompletion <- 0
 		case haloGetWorld:
-			for i := range worldFragment {
-				sendRowToChannel(worldFragment[i], w.width, w.sendResult)
+			for i := 0; i < w.rows; i++ {
+				sendRowToChannel(worldFragment, i+1, w.width, w.sendResult)
 			}
 		}
 	}
@@ -153,15 +147,15 @@ func (h *halo) nextTurn() {
 
 func (h *halo) getWorld() world {
 	world := newWorld(h.height, h.width)
-	rowCounter := 0
+	// Collect results from workers
+	recv := 0
 	for _, worker := range h.workers {
 		worker.sendCommand <- haloGetWorld
-		for i := 0; i < worker.rows; i++ {
-			for w := 0; w < h.width; w++ {
-				world.matrix[rowCounter][w] = <-worker.getResult
-			}
-			rowCounter++
+		size := worker.rows * h.width
+		for i := 0; i < worker.rows*h.width; i++ {
+			world.matrix[i+recv] = <-worker.getResult
 		}
+		recv += size
 	}
 	return world
 }
