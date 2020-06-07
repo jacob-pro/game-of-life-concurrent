@@ -5,7 +5,7 @@ if [[ "$(uname)" =~ MSYS*|CYGWIN*|MINGW* ]]; then
   rustup override set stable-gnu
 fi
 
-if ! command -v rustup &>/dev/null; then
+if ! command -v cbindgen &>/dev/null; then
   echo 'Downloading cbindgen...'
   cargo install cbindgen
 fi
