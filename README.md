@@ -1,4 +1,11 @@
-# concurrent-coursework
+# Game of Life
+
+Bristol COMS20001_2019 Concurrent Computing (Yr 2), 
+Coursework 1: Game of Life
+
+Various concurrent implementations of Conway's Game of Life
+
+## Building
 
 To run in Goland/Jetbrains add a `go build` build configuration in the `src` directory. 
 Make sure to enable `run.processes.with.pty` in the registry so that termbox will work
