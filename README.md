@@ -3,7 +3,11 @@
 Bristol COMS20001_2019 Concurrent Computing (Yr 2), 
 Coursework 1: Game of Life
 
-Various concurrent implementations of Conway's Game of Life
+Various concurrent implementations of Conway's Game of Life. 
+
+The primary stage of the assignment was to implement the GoL using Go channels in a halo-exchange system, 
+the secondary stage allowed us to choose our own method with the goal of making it as fast as possible. I
+took an unconventional but very fast approach - writing the core logic in Rust and linking it as a static library!
 
 ## Building
 
